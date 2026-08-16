@@ -21,9 +21,9 @@ function parseMetadata(source) {
   }
   const first = (key, fallback = '') => metadata[key]?.[0] || fallback;
   return {
-    name: first('name'),
+    name: first('name:en', first('name')),
     version: first('version'),
-    description: first('description'),
+    description: first('description:en', first('description')),
     author: first('author', 'ZhangNingYA'),
     matches: metadata.match || [],
     homepage: first('homepageURL'),
@@ -40,31 +40,31 @@ function escapeHtml(value) {
 function detailPage(script) {
   const matchRows = script.matches.length
     ? script.matches.map((match) => `<li><code>${escapeHtml(match)}</code></li>`).join('')
-    : '<li>未声明匹配网址</li>';
+    : '<li>No URL patterns declared</li>';
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
-  <title>${escapeHtml(script.name)} · Userscripts</title>
+  <title>${escapeHtml(script.name)} - Userscripts</title>
   <link rel="stylesheet" href="../../assets/styles.css">
 </head>
 <body>
-  <header class="topbar"><a class="wordmark" href="../../">ZhangNingYA <span>/ scripts</span></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">GitHub</a></header>
-  <main class="detail-shell">
-    <a class="back-link" href="../../">← 返回脚本目录</a>
-    <section class="detail-card">
-      <div class="script-icon">${escapeHtml(script.name.charAt(0) || 'U')}</div>
-      <div class="detail-heading"><p class="eyebrow">USER SCRIPT · v${escapeHtml(script.version)}</p><h1>${escapeHtml(script.name)}</h1><p>${escapeHtml(script.description)}</p></div>
-      <a class="primary-button" href="./${encodeURIComponent(script.filename)}">安装脚本</a>
+  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">Z</span><span>ZhangNingYA</span><span class="wordmark-section">/ Userscripts</span></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
+  <main class="page-shell detail-shell">
+    <a class="back-link" href="../../"><span aria-hidden="true">←</span> All scripts</a>
+    <section class="detail-summary">
+      <span class="script-icon detail-icon" aria-hidden="true">${escapeHtml(script.name.charAt(0) || 'U')}</span>
+      <div class="detail-heading"><p class="section-label">Userscript · v${escapeHtml(script.version)}</p><h1>${escapeHtml(script.name)}</h1><p>${escapeHtml(script.description)}</p></div>
+      <a class="primary-button" href="./${encodeURIComponent(script.filename)}"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2"/></svg>Install script</a>
     </section>
     <section class="detail-grid">
-      <article><h2>适用网站</h2><ul class="match-list">${matchRows}</ul></article>
-      <article><h2>更新方式</h2><p>安装一次后，油猴会根据脚本版本自动检查更新。需要立即更新时，可在扩展菜单中运行“检查脚本更新”。</p></article>
+      <article><h2>Runs on</h2><ul class="match-list">${matchRows}</ul></article>
+      <article><h2>Updates</h2><p>Your userscript manager checks this script version automatically. You can also run a manual update check from the extension menu.</p></article>
     </section>
   </main>
-  <footer>公开脚本中不包含密码、Token 或私人数据。</footer>
+  <footer><span>Maintained by ZhangNingYA</span><span>Public source, no embedded secrets</span></footer>
 </body>
 </html>`;
 }
@@ -96,4 +96,3 @@ for (const folder of folders) {
 
 await writeFile(path.join(outputRoot, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
 console.log(`Built ${catalog.length} userscript${catalog.length === 1 ? '' : 's'} into ${outputRoot}`);
-

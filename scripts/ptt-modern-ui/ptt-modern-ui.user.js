@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         PTT 現代化介面
+// @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
 // @version      2.4.2
 // @description  將 PTT 轉換為現代化瀑布流 SPA 閱讀器，支援無限滾動、頁面狀態還原與閱讀設定
+// @description:en Transform PTT into a modern waterfall-style SPA reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
 // @homepageURL  https://scripts.fulafu.com/scripts/ptt-modern-ui/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
