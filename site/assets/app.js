@@ -11,20 +11,25 @@ fetch('./catalog.json')
     return response.json();
   })
   .then((scripts) => {
-    count.textContent = `${scripts.length} 个维护中的脚本`;
+    count.textContent = `${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}`;
     if (!scripts.length) {
-      grid.innerHTML = '<p class="empty-state">脚本正在整理中。</p>';
+      grid.innerHTML = '<p class="empty-state">No scripts have been published yet.</p>';
       return;
     }
     grid.innerHTML = scripts.map((script) => `
       <article class="script-card">
-        <div class="card-top"><span class="script-icon">${escapeHtml(script.name.charAt(0) || 'U')}</span><span class="version">v${escapeHtml(script.version)}</span></div>
-        <div><h3>${escapeHtml(script.name)}</h3><p>${escapeHtml(script.description)}</p></div>
-        <div class="card-actions"><a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}">安装</a><a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/">查看详情 →</a></div>
+        <span class="script-icon" aria-hidden="true">${escapeHtml(script.name.charAt(0) || 'U')}</span>
+        <div class="script-summary">
+          <div class="script-title"><h3>${escapeHtml(script.name)}</h3><span class="version">v${escapeHtml(script.version)}</span></div>
+          <p>${escapeHtml(script.description)}</p>
+        </div>
+        <div class="card-actions">
+          <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/">Details <span aria-hidden="true">→</span></a>
+          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2"/></svg>Install</a>
+        </div>
       </article>`).join('');
   })
   .catch((error) => {
-    count.textContent = '目录读取失败';
-    grid.innerHTML = `<p class="empty-state">暂时无法读取脚本：${escapeHtml(error.message)}</p>`;
+    count.textContent = 'Unavailable';
+    grid.innerHTML = `<p class="empty-state">The catalog could not be loaded: ${escapeHtml(error.message)}</p>`;
   });
-
