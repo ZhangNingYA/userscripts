@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         PTT 現代化介面
 // @namespace    https://www.ptt.cc/
-// @version      2.4.1
+// @version      2.4.2
 // @description  將 PTT 轉換為現代化瀑布流 SPA 閱讀器，支援無限滾動、頁面狀態還原與閱讀設定
 // @author       Codex
-// @homepageURL  https://zhangningya.github.io/userscripts/scripts/ptt-modern-ui/
+// @homepageURL  https://scripts.fulafu.com/scripts/ptt-modern-ui/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
-// @updateURL    https://zhangningya.github.io/userscripts/scripts/ptt-modern-ui/ptt-modern-ui.user.js
-// @downloadURL  https://zhangningya.github.io/userscripts/scripts/ptt-modern-ui/ptt-modern-ui.user.js
+// @updateURL    https://scripts.fulafu.com/scripts/ptt-modern-ui/ptt-modern-ui.user.js
+// @downloadURL  https://scripts.fulafu.com/scripts/ptt-modern-ui/ptt-modern-ui.user.js
 // @match        https://www.ptt.cc/*
 // @match        https://ptt.cc/*
 // @run-at       document-start

@@ -1,6 +1,6 @@
 # Userscripts
 
-ZhangNingYA 的油猴脚本中心。仓库中的脚本会通过 GitHub Pages 发布，并由油猴的 `@updateURL` 自动更新。
+ZhangNingYA 的油猴脚本中心。仓库中的脚本会发布到 [scripts.fulafu.com](https://scripts.fulafu.com/)，并由油猴的 `@updateURL` 自动更新。
 
 ## 目录结构
 
@@ -33,4 +33,3 @@ npm run build
 4. 等待 Pages 部署完成，已安装脚本会按油猴的更新周期获取新版本。
 
 不要在 userscript 中保存密码、Token 或其他秘密信息；发布后的脚本文件是公开可访问的。
-
