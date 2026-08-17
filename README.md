@@ -6,6 +6,8 @@ ZhangNingYA 的油猴脚本中心。仓库中的脚本会发布到 [scripts.fula
 
 ```text
 scripts/
+  chatgpt-focus/
+    chatgpt-focus.user.js
   ptt-modern-ui/
     ptt-modern-ui.user.js
 site/
