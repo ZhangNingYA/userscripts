@@ -48,21 +48,28 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=2">
+  <link rel="stylesheet" href="../../assets/styles.css?v=3">
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">Z</span><span>ZhangNingYA</span><span class="wordmark-section">/ Userscripts</span></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
   <main class="page-shell detail-shell">
     <a class="back-link" href="../../"><span aria-hidden="true">←</span> All scripts</a>
-    <section class="detail-summary">
-      <span class="script-icon detail-icon" aria-hidden="true">${escapeHtml(script.name.charAt(0) || 'U')}</span>
-      <div class="detail-heading"><p class="section-label">Userscript · v${escapeHtml(script.version)}</p><h1>${escapeHtml(script.name)}</h1><p>${escapeHtml(script.description)}</p></div>
-      <a class="primary-button" href="./${encodeURIComponent(script.filename)}"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2"/></svg>Install script</a>
-    </section>
-    <section class="detail-grid">
-      <article><h2>Runs on</h2><ul class="match-list">${matchRows}</ul></article>
-      <article><h2>Updates</h2><p>Your userscript manager checks this script version automatically. You can also run a manual update check from the extension menu.</p></article>
-    </section>
+    <article class="detail-article">
+      <header class="detail-heading">
+        <p class="section-label">Userscript <span aria-hidden="true">/</span> Version ${escapeHtml(script.version)}</p>
+        <h1>${escapeHtml(script.name)}</h1>
+        <p class="detail-lede">${escapeHtml(script.description)}</p>
+        <div class="detail-actions">
+          <a class="primary-button" href="./${encodeURIComponent(script.filename)}">Install .user.js</a>
+          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
+        </div>
+      </header>
+      <div class="detail-grid">
+        <section><h2>Runs on</h2><ul class="match-list">${matchRows}</ul></section>
+        <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
+        <section><h2>Updates</h2><p>Your userscript manager checks the published version automatically through the script's update URL.</p></section>
+      </div>
+    </article>
   </main>
   <footer><span>Maintained by ZhangNingYA</span><span>Public source, no embedded secrets</span></footer>
 </body>
@@ -82,14 +89,16 @@ for (const folder of folders) {
   const files = (await readdir(sourceFolder)).filter((file) => file.endsWith('.user.js'));
   if (files.length !== 1) throw new Error(`${folder.name} must contain exactly one .user.js file`);
   const filename = files[0];
+  const textFilename = filename.replace(/\.user\.js$/, '.txt');
   const sourceFile = path.join(sourceFolder, filename);
   execFileSync(process.execPath, ['--check', sourceFile], { stdio: 'inherit' });
   const metadata = parseMetadata(await readFile(sourceFile, 'utf8'));
   if (!metadata.name || !metadata.version || !metadata.description) throw new Error(`${filename} is missing required metadata`);
-  const script = { slug: folder.name, filename, ...metadata };
+  const script = { slug: folder.name, filename, textFilename, ...metadata };
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
   await mkdir(targetFolder, { recursive: true });
   await copyFile(sourceFile, path.join(targetFolder, filename));
+  await copyFile(sourceFile, path.join(targetFolder, textFilename));
   await writeFile(path.join(targetFolder, 'index.html'), detailPage(script));
   catalog.push(script);
 }

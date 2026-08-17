@@ -16,16 +16,17 @@ fetch('./catalog.json')
       grid.innerHTML = '<p class="empty-state">No scripts have been published yet.</p>';
       return;
     }
-    grid.innerHTML = scripts.map((script) => `
-      <article class="script-card">
-        <span class="script-icon" aria-hidden="true">${escapeHtml(script.name.charAt(0) || 'U')}</span>
+    grid.innerHTML = scripts.map((script, index) => `
+      <article class="script-entry">
+        <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
-          <div class="script-title"><h3>${escapeHtml(script.name)}</h3><span class="version">v${escapeHtml(script.version)}</span></div>
+          <p class="script-meta">Userscript <span aria-hidden="true">/</span> v${escapeHtml(script.version)}</p>
+          <h3><a href="scripts/${encodeURIComponent(script.slug)}/">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
         </div>
-        <div class="card-actions">
+        <div class="entry-actions">
           <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/">Details <span aria-hidden="true">→</span></a>
-          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2"/></svg>Install</a>
+          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}">Install</a>
         </div>
       </article>`).join('');
   })
