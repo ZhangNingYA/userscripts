@@ -3,10 +3,10 @@
 // @name:zh-CN   ChatGPT 专注模式
 // @name:en      ChatGPT Focus
 // @namespace    https://scripts.fulafu.com/
-// @version      1.5.0
-// @description  A quiet text-first ChatGPT layout with focused navigation, a mobile drawer, and sensible model defaults.
-// @description:zh-CN 精简 ChatGPT 首页与侧栏，提供移动抽屉，同时保留文字聊天、模型、附件和下载功能。
-// @description:en A quiet text-first ChatGPT layout with focused navigation, a mobile drawer, and sensible model defaults.
+// @version      1.6.0
+// @description  A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.
+// @description:zh-CN 为 ChatGPT 提供最近对话、移动导航、正文阅读排版和字号控制，同时保留模型、附件与下载功能。
+// @description:en A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.
 // @author       ZhangNingYA
 // @homepageURL  https://scripts.fulafu.com/scripts/chatgpt-focus/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
@@ -21,16 +21,22 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.5.0';
-    const SCRIPT_RELEASED_AT = '2026-08-17 14:24:44 UTC+8';
+    const SCRIPT_VERSION = '1.6.0';
+    const SCRIPT_RELEASED_AT = '2026-08-17 14:43:24 UTC+8';
     const SIDEBAR_ID = 'cgpt-focus-sidebar';
     const MOBILE_TOGGLE_ID = 'cgpt-focus-mobile-toggle';
     const BACKDROP_ID = 'cgpt-focus-backdrop';
-    const CACHE_KEY = 'cgpt-focus-recent-v1';
+    const CACHE_KEY = 'cgpt-focus-recent-v2';
+    const LEGACY_CACHE_KEY = 'cgpt-focus-recent-v1';
     const COLLAPSE_KEY = 'cgpt-focus-sidebar-collapsed-v1';
+    const FONT_SIZE_KEY = 'cgpt-focus-reading-font-size-v1';
     const MOBILE_QUERY = '(max-width: 700px)';
     const mobileMedia = window.matchMedia(MOBILE_QUERY);
     const MAX_RECENT = 5;
+    const RECENT_REFRESH_MS = 60 * 1000;
+    const DEFAULT_FONT_SIZE = 17;
+    const MIN_FONT_SIZE = 15;
+    const MAX_FONT_SIZE = 20;
     const CHAT_PATH_RE = /(?:^|\/)c\/[A-Za-z0-9_-]+\/?$/;
     const CHAT_ROUTE_RE = /^\/$|^\/c\/|^\/g\/[^/]+\/c\//;
     const WORK_LABEL_RE = /^(?:work|chatgpt work|工作|工作模式|工作区|开始工作)[？?。！!]?$/i;
@@ -50,6 +56,9 @@
             --cgpt-focus-sidebar-expanded: 232px;
             --cgpt-focus-sidebar-collapsed: 56px;
             --cgpt-focus-sidebar-width: var(--cgpt-focus-sidebar-expanded);
+            --cgpt-focus-reading-font-size: 17px;
+            --cgpt-focus-reading-line-height: 1.78;
+            --cgpt-focus-reading-measure: 72ch;
         }
 
         html.cgpt-focus-collapsed {
@@ -106,6 +115,89 @@
         html.cgpt-focus-active [role="button"][aria-label*="语音" i],
         html.cgpt-focus-active [role="button"][aria-label*="听写" i] {
             display: none !important;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose {
+            width: 100%;
+            max-width: var(--cgpt-focus-reading-measure);
+            margin-inline: auto;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+            font-size: var(--cgpt-focus-reading-font-size) !important;
+            line-height: var(--cgpt-focus-reading-line-height) !important;
+            letter-spacing: 0 !important;
+            overflow-wrap: anywhere;
+            text-wrap: pretty;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown p,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose p {
+            margin-block: 0 1em;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown p:last-child,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose p:last-child {
+            margin-bottom: 0;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] :is(.markdown, .prose) > :first-child {
+            margin-top: 0 !important;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] :is(.markdown, .prose) > :last-child {
+            margin-bottom: 0 !important;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown h1,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown h2,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown h3,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose h1,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose h2,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose h3 {
+            margin-block: 1.55em .65em;
+            line-height: 1.35 !important;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown ul,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown ol,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose ul,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose ol {
+            margin-block: .7em 1em;
+            padding-inline-start: 1.45em;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown li,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose li {
+            margin-block: .32em;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown blockquote,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose blockquote {
+            margin: 1.1em 0;
+            padding: .15em 0 .15em 1em;
+            color: var(--text-secondary, #5f6368);
+            border-left: 2px solid var(--border-medium, rgba(0, 0, 0, .24));
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] .markdown a,
+        html.cgpt-focus-active [data-message-author-role="assistant"] .prose a {
+            text-decoration-thickness: 1px;
+            text-underline-offset: .18em;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] :is(.markdown, .prose) :is(pre, table) {
+            max-width: 100%;
+            font-size: .88em;
+            line-height: 1.58;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] :is(.markdown, .prose) table {
+            display: block;
+            overflow-x: auto;
+        }
+
+        html.cgpt-focus-active [data-message-author-role="assistant"] :is(.markdown, .prose) :not(pre) > code {
+            font-size: .9em;
         }
 
         #${SIDEBAR_ID} {
@@ -213,6 +305,64 @@
             text-align: center;
         }
 
+        #${SIDEBAR_ID} .cgpt-focus-reading-controls {
+            display: flex;
+            min-height: 38px;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 0 2px 2px 10px;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-reading-label {
+            min-width: 0;
+            overflow: hidden;
+            color: var(--text-secondary, rgba(32, 33, 35, .68));
+            font-size: 11px;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-stepper {
+            display: grid;
+            grid-template-columns: 34px 30px 34px;
+            align-items: center;
+            overflow: hidden;
+            border: 1px solid var(--border-medium, rgba(0, 0, 0, .15));
+            border-radius: 6px;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-font-button {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 650;
+            line-height: 1;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-font-button:hover:not(:disabled) {
+            background: var(--sidebar-surface-secondary, var(--token-sidebar-surface-secondary, rgba(0, 0, 0, .06)));
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-font-button:disabled {
+            cursor: default;
+            opacity: .36;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-font-size {
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+        }
+
         #${SIDEBAR_ID} .cgpt-focus-list {
             display: flex;
             min-height: 0;
@@ -259,6 +409,13 @@
             font-weight: 600;
         }
 
+        #${SIDEBAR_ID} .cgpt-focus-recent-status {
+            padding: 12px 10px;
+            color: var(--text-secondary, rgba(32, 33, 35, .58));
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
         #${SIDEBAR_ID} button:focus-visible,
         #${SIDEBAR_ID} a:focus-visible {
             outline: 2px solid var(--text-primary, #202123);
@@ -284,6 +441,7 @@
         html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-new-label,
         html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-list,
         html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-title,
+        html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-reading-controls,
         html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-footer {
             display: none;
         }
@@ -299,12 +457,22 @@
                 color: var(--text-secondary, rgba(236, 236, 241, 0.58));
                 border-top-color: var(--border-light, rgba(255, 255, 255, 0.12));
             }
+
+            #${SIDEBAR_ID} .cgpt-focus-reading-label {
+                color: var(--text-secondary, rgba(236, 236, 241, .68));
+            }
+
+            #${SIDEBAR_ID} .cgpt-focus-recent-status {
+                color: var(--text-secondary, rgba(236, 236, 241, .58));
+            }
         }
 
         @media (max-width: 700px) {
             :root {
                 --cgpt-focus-sidebar-expanded: min(86vw, 310px);
                 --cgpt-focus-sidebar-collapsed: 0px;
+                --cgpt-focus-reading-line-height: 1.74;
+                --cgpt-focus-reading-measure: 100%;
             }
 
             html.cgpt-focus-active .cgpt-focus-app-root,
@@ -339,8 +507,22 @@
             }
 
             #${SIDEBAR_ID} .cgpt-focus-toggle,
-            #${SIDEBAR_ID} .cgpt-focus-new {
+            #${SIDEBAR_ID} .cgpt-focus-new,
+            #${SIDEBAR_ID} .cgpt-focus-font-button {
                 min-height: 44px;
+            }
+
+            #${SIDEBAR_ID} .cgpt-focus-reading-controls {
+                min-height: 46px;
+            }
+
+            #${SIDEBAR_ID} .cgpt-focus-stepper {
+                grid-template-columns: 44px 34px 44px;
+            }
+
+            #${SIDEBAR_ID} .cgpt-focus-font-button {
+                width: 44px;
+                height: 44px;
             }
 
             #${SIDEBAR_ID} .cgpt-focus-chat {
@@ -407,6 +589,7 @@
             html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-title,
             html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-new-label,
             html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-list,
+            html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-reading-controls,
             html.cgpt-focus-collapsed #${SIDEBAR_ID} .cgpt-focus-footer {
                 display: flex;
             }
@@ -468,6 +651,50 @@
             // Fall through to the expanded desktop default.
         }
         return false;
+    }
+
+    function readFontSize() {
+        try {
+            const stored = Number.parseInt(localStorage.getItem(FONT_SIZE_KEY) || '', 10);
+            if (Number.isFinite(stored)) {
+                return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, stored));
+            }
+        } catch {
+            // Fall through to the reading-friendly default.
+        }
+        return DEFAULT_FONT_SIZE;
+    }
+
+    let currentFontSize = DEFAULT_FONT_SIZE;
+
+    function setFontSize(size, persist = true) {
+        const nextSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Number(size) || DEFAULT_FONT_SIZE));
+        currentFontSize = nextSize;
+        document.documentElement.style.setProperty('--cgpt-focus-reading-font-size', `${nextSize}px`);
+
+        const output = document.querySelector(`#${SIDEBAR_ID} .cgpt-focus-font-size`);
+        if (output) {
+            output.textContent = String(nextSize);
+            output.setAttribute('aria-label', `正文字号 ${nextSize} 像素`);
+        }
+
+        const decrease = document.querySelector(`#${SIDEBAR_ID} [data-font-action="decrease"]`);
+        const increase = document.querySelector(`#${SIDEBAR_ID} [data-font-action="increase"]`);
+        if (decrease) {
+            decrease.disabled = nextSize <= MIN_FONT_SIZE;
+        }
+        if (increase) {
+            increase.disabled = nextSize >= MAX_FONT_SIZE;
+        }
+
+        if (persist) {
+            try {
+                localStorage.setItem(FONT_SIZE_KEY, String(nextSize));
+            } catch {
+                // The control still works for this page when storage is unavailable.
+            }
+        }
+        return nextSize;
     }
 
     function setSidebarCollapsed(collapsed, persist = true) {
@@ -534,6 +761,7 @@
             return false;
         }
         setSidebarCollapsed(readCollapsedState(), false);
+        setFontSize(readFontSize(), false);
         return true;
     }
 
@@ -1037,27 +1265,75 @@
         }, delay);
     }
 
-    function readCache() {
+    function normalizeRecentItems(items) {
+        if (!Array.isArray(items)) {
+            return [];
+        }
+        return items
+            .map((item) => ({ path: normalizePath(item && item.path), title: cleanTitle(item && item.title) }))
+            .filter((item) => item.path && item.title)
+            .slice(0, MAX_RECENT);
+    }
+
+    function parseRecentCache(raw) {
         try {
-            const parsed = JSON.parse(sessionStorage.getItem(CACHE_KEY) || '[]');
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
-            return parsed
-                .map((item) => ({ path: normalizePath(item && item.path), title: cleanTitle(item && item.title) }))
-                .filter((item) => item.path && item.title)
-                .slice(0, MAX_RECENT);
+            return normalizeRecentItems(JSON.parse(raw || '[]'));
         } catch {
             return [];
         }
     }
 
-    function writeCache(items) {
+    function readCache() {
         try {
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
+            const local = parseRecentCache(localStorage.getItem(CACHE_KEY));
+            if (local.length) {
+                return local;
+            }
         } catch {
-            // The sidebar still works when site storage is unavailable.
+            // Try session storage below.
         }
+
+        for (const key of [CACHE_KEY, LEGACY_CACHE_KEY]) {
+            try {
+                const session = parseRecentCache(sessionStorage.getItem(key));
+                if (session.length) {
+                    return session;
+                }
+            } catch {
+                // Continue to the next compatible cache.
+            }
+        }
+        return [];
+    }
+
+    function writeCache(items) {
+        const serialized = JSON.stringify(normalizeRecentItems(items));
+        try {
+            localStorage.setItem(CACHE_KEY, serialized);
+            return;
+        } catch {
+            // Fall back to per-tab storage when persistent storage is unavailable.
+        }
+        try {
+            sessionStorage.setItem(CACHE_KEY, serialized);
+        } catch {
+            // Recent chats still render for this page when storage is unavailable.
+        }
+    }
+
+    function mergeRecent(...groups) {
+        const merged = [];
+        for (const group of groups) {
+            for (const item of normalizeRecentItems(group)) {
+                if (!merged.some((existing) => existing.path === item.path)) {
+                    merged.push(item);
+                }
+                if (merged.length === MAX_RECENT) {
+                    return merged;
+                }
+            }
+        }
+        return merged;
     }
 
     function getLinkTitle(link) {
@@ -1102,17 +1378,94 @@
             }
         }
 
-        for (const item of [...found, ...cached]) {
-            if (!merged.some((existing) => existing.path === item.path)) {
-                merged.push(item);
-            }
-            if (merged.length === MAX_RECENT) {
-                break;
-            }
-        }
+        merged.push(...mergeRecent(found, cached).filter((item) =>
+            !merged.some((existing) => existing.path === item.path)).slice(0, MAX_RECENT - merged.length));
 
         writeCache(merged);
         return merged;
+    }
+
+    function parseRecentResponse(payload) {
+        const source = Array.isArray(payload && payload.items)
+            ? payload.items
+            : (Array.isArray(payload && payload.conversations) ? payload.conversations : []);
+
+        return normalizeRecentItems(source.map((item) => {
+            const id = cleanTitle(item && (item.id || item.conversation_id));
+            if (!id) {
+                return null;
+            }
+            const gizmoId = cleanTitle(item && item.gizmo_id);
+            const path = gizmoId
+                ? `/g/${encodeURIComponent(gizmoId)}/c/${encodeURIComponent(id)}`
+                : `/c/${encodeURIComponent(id)}`;
+            return {
+                path,
+                title: cleanTitle(item && (item.title || item.name)) || '未命名对话'
+            };
+        }).filter(Boolean));
+    }
+
+    let recentRequest = null;
+    let recentLastAttemptAt = 0;
+    let recentState = 'loading';
+
+    async function refreshRecentFromApi(force = false) {
+        if (!isChatRoute() || typeof window.fetch !== 'function') {
+            return readCache();
+        }
+        if (recentRequest) {
+            return recentRequest;
+        }
+        if (!force && Date.now() - recentLastAttemptAt < RECENT_REFRESH_MS) {
+            return readCache();
+        }
+
+        recentLastAttemptAt = Date.now();
+        recentState = 'loading';
+        renderRecent(readCache(), recentState);
+
+        recentRequest = (async () => {
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            const timeout = controller ? window.setTimeout(() => controller.abort(), 8000) : 0;
+            try {
+                const url = new URL('/backend-api/conversations', location.origin);
+                url.searchParams.set('offset', '0');
+                url.searchParams.set('limit', String(MAX_RECENT));
+                url.searchParams.set('order', 'updated');
+                url.searchParams.set('is_archived', 'false');
+                const response = await window.fetch(url, {
+                    credentials: 'include',
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' },
+                    signal: controller ? controller.signal : undefined
+                });
+                if (!response.ok) {
+                    throw new Error(`Recent chats request failed with HTTP ${response.status}`);
+                }
+
+                const apiItems = parseRecentResponse(await response.json());
+                const recent = mergeRecent(apiItems, collectRecentLinks(), readCache());
+                if (recent.length) {
+                    writeCache(recent);
+                }
+                recentState = recent.length ? 'ready' : 'empty';
+                renderRecent(recent, recentState);
+                return recent;
+            } catch {
+                const fallback = collectRecentLinks();
+                recentState = fallback.length ? 'ready' : 'unavailable';
+                renderRecent(fallback, recentState);
+                return fallback;
+            } finally {
+                if (timeout) {
+                    window.clearTimeout(timeout);
+                }
+                recentRequest = null;
+            }
+        })();
+
+        return recentRequest;
     }
 
     function findNativeConversationLink(path) {
@@ -1213,9 +1566,46 @@
             navigateWithNativeControl('/', findNewChatControl());
         });
 
+        const readingControls = document.createElement('div');
+        readingControls.className = 'cgpt-focus-reading-controls';
+        readingControls.setAttribute('role', 'group');
+        readingControls.setAttribute('aria-label', '正文阅读字号');
+
+        const readingLabel = document.createElement('span');
+        readingLabel.className = 'cgpt-focus-reading-label';
+        readingLabel.textContent = '正文字号';
+
+        const stepper = document.createElement('div');
+        stepper.className = 'cgpt-focus-stepper';
+
+        const decreaseFont = document.createElement('button');
+        decreaseFont.type = 'button';
+        decreaseFont.className = 'cgpt-focus-font-button';
+        decreaseFont.dataset.fontAction = 'decrease';
+        decreaseFont.textContent = 'A−';
+        decreaseFont.title = '减小正文字号';
+        decreaseFont.setAttribute('aria-label', '减小正文字号');
+
+        const fontSize = document.createElement('output');
+        fontSize.className = 'cgpt-focus-font-size';
+
+        const increaseFont = document.createElement('button');
+        increaseFont.type = 'button';
+        increaseFont.className = 'cgpt-focus-font-button';
+        increaseFont.dataset.fontAction = 'increase';
+        increaseFont.textContent = 'A+';
+        increaseFont.title = '增大正文字号';
+        increaseFont.setAttribute('aria-label', '增大正文字号');
+
+        decreaseFont.addEventListener('click', () => setFontSize(currentFontSize - 1));
+        increaseFont.addEventListener('click', () => setFontSize(currentFontSize + 1));
+        stepper.append(decreaseFont, fontSize, increaseFont);
+        readingControls.append(readingLabel, stepper);
+
         const list = document.createElement('nav');
         list.className = 'cgpt-focus-list';
         list.setAttribute('aria-label', '最近聊天');
+        list.setAttribute('aria-live', 'polite');
 
         const footer = document.createElement('footer');
         footer.className = 'cgpt-focus-footer';
@@ -1230,24 +1620,35 @@
         released.title = SCRIPT_RELEASED_AT;
         footer.append(version, released);
 
-        sidebar.append(toolbar, newChat, list, footer);
+        sidebar.append(toolbar, newChat, readingControls, list, footer);
         document.body.append(backdrop, sidebar, mobileToggle);
         setSidebarCollapsed(document.documentElement.classList.contains('cgpt-focus-collapsed'), false);
+        setFontSize(readFontSize(), false);
     }
 
-    function renderRecent(items) {
+    function renderRecent(items, state = items.length ? 'ready' : recentState) {
         const list = document.querySelector(`#${SIDEBAR_ID} .cgpt-focus-list`);
         if (!list) {
             return;
         }
 
         const currentPath = normalizePath(location.pathname);
-        const signature = JSON.stringify(items.map((item) => [item.path, item.title, item.path === currentPath]));
+        const signature = JSON.stringify([state, ...items.map((item) => [item.path, item.title, item.path === currentPath])]);
         if (list.dataset.signature === signature) {
             return;
         }
 
         const fragment = document.createDocumentFragment();
+        if (!items.length) {
+            const status = document.createElement('p');
+            status.className = 'cgpt-focus-recent-status';
+            status.textContent = {
+                loading: '正在读取最近对话…',
+                empty: '暂无最近对话',
+                unavailable: '最近对话暂不可用'
+            }[state] || '暂无最近对话';
+            fragment.appendChild(status);
+        }
         for (const item of items.slice(0, MAX_RECENT)) {
             const link = document.createElement('a');
             link.className = 'cgpt-focus-chat';
@@ -1389,7 +1790,11 @@
             pruneHome();
         }
         const recent = collectRecentLinks();
-        renderRecent(recent);
+        if (recent.length) {
+            recentState = 'ready';
+        }
+        renderRecent(recent, recentState);
+        void refreshRecentFromApi();
         markNativeSidebars();
         markNativeSidebarControls();
         scheduleModelSetup();
@@ -1454,6 +1859,9 @@
 
         window.addEventListener('popstate', () => scheduleRefresh(0));
         window.addEventListener('cgpt-focus-navigate', () => scheduleRefresh(0));
+        window.addEventListener('focus', () => {
+            void refreshRecentFromApi();
+        });
         document.addEventListener('keydown', (event) => {
             if (event.isTrusted
                 && event.key === 'Escape'
