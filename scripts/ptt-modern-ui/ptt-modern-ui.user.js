@@ -2,7 +2,7 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.5.1
+// @version      2.6.0
 // @description  將 PTT 轉換為最新優先的瀑布流 SPA 閱讀器，支援向下無限載入、頁面狀態還原與閱讀設定
 // @description:en Transform PTT into a modern latest-first waterfall reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
@@ -19,8 +19,8 @@
 (function () {
   'use strict';
 
-  const SCRIPT_VERSION = '2.5.1';
-  const SCRIPT_RELEASED_AT = '2026-08-17 13:38:19 UTC+8';
+  const SCRIPT_VERSION = '2.6.0';
+  const SCRIPT_RELEASED_AT = '2026-08-17 15:35:48 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -81,7 +81,8 @@
       paper: '白纸', ink: '墨夜', mist: '雾蓝', rose: '柔灰', fontSize: '正文字号', smaller: '减小字号', larger: '增大字号',
       up: '推', neutral: '箭头', down: '嘘', progress: '阅读进度', loading: '正在读取 PTT', retry: '重新载入', loadError: '页面读取失败',
       noStories: '本页没有可显示的文章', deleted: '文章已删除', hot: '热', pinned: '置顶', close: '关闭', discussion: '讨论区',
-      loadingMore: '正在加载更多文章', noMore: '没有更多文章了', loadMoreFailed: '加载失败，继续下滑重试'
+      loadingMore: '正在加载更多文章', noMore: '没有更多文章了', loadMoreFailed: '加载失败，继续下滑重试',
+      notFoundTitle: '页面不存在', notFoundDetail: '这个链接可能已经失效，或页码超出了看板范围。', backLatest: '返回 {board} 最新页'
     },
     'zh-TW': {
       reader: 'PTT 閱讀器', board: '看板', articles: '文章列表', search: '搜尋文章', searchResults: '搜尋結果', stories: '文章',
@@ -90,7 +91,8 @@
       paper: '白紙', ink: '墨夜', mist: '霧藍', rose: '柔灰', fontSize: '正文字號', smaller: '減小字號', larger: '增大字號',
       up: '推', neutral: '箭頭', down: '噓', progress: '閱讀進度', loading: '正在讀取 PTT', retry: '重新載入', loadError: '頁面讀取失敗',
       noStories: '本頁沒有可顯示的文章', deleted: '文章已刪除', hot: '熱門', pinned: '置頂', close: '關閉', discussion: '討論區',
-      loadingMore: '正在載入更多文章', noMore: '沒有更多文章了', loadMoreFailed: '載入失敗，繼續下滑重試'
+      loadingMore: '正在載入更多文章', noMore: '沒有更多文章了', loadMoreFailed: '載入失敗，繼續下滑重試',
+      notFoundTitle: '頁面不存在', notFoundDetail: '這個連結可能已經失效，或頁碼超出了看板範圍。', backLatest: '返回 {board} 最新頁'
     }
   };
 
@@ -200,7 +202,15 @@
     .pttr-theme-swatch { width:20px; height:20px; flex:0 0 20px; border-radius:50%; background:var(--swatch); border:1px solid rgba(80,80,80,.2); }
     .pttr-font-control { display:grid; grid-template-columns:36px 1fr 36px; align-items:center; gap:8px; } .pttr-font-control button { width:36px; height:34px; padding:0; border:1px solid var(--r-border); border-radius:6px; color:var(--r-text); background:var(--r-surface); cursor:pointer; } .pttr-font-control button:hover { border-color:var(--r-accent); color:var(--r-accent); } .pttr-font-control output { color:var(--r-muted); text-align:center; font-size:12px; }
     .pttr-loading { padding:34px 0; } .pttr-skeleton { height:82px; border-bottom:1px solid var(--r-border); background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--r-surface) 80%,transparent),transparent); background-size:220% 100%; animation:pttr-shimmer 1.2s linear infinite; } @keyframes pttr-shimmer { to { background-position:-220% 0; } }
-    .pttr-error { max-width:520px; margin:80px auto; padding:28px 0; text-align:center; border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); } .pttr-error h2 { margin:0 0 8px; font-size:18px; } .pttr-error p { margin:0 0 18px; color:var(--r-muted); } .pttr-error button { min-height:38px; padding:0 15px; border:1px solid var(--r-accent); border-radius:6px; color:var(--r-accent); background:transparent; cursor:pointer; }
+    .pttr-error { max-width:560px; margin:clamp(64px,12vh,128px) auto; padding:42px 28px; text-align:center; border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); }
+    .pttr-error-code { margin:0 0 10px!important; color:var(--r-accent)!important; font-size:11px; font-weight:760; letter-spacing:.08em!important; text-transform:uppercase; }
+    .pttr-error h2 { margin:0 0 10px; color:var(--r-text); font-size:24px; line-height:1.35; }
+    .pttr-error > p:not(.pttr-error-code) { max-width:430px; margin:0 auto 24px; color:var(--r-muted); font-size:13px; line-height:1.7; }
+    .pttr-error-actions { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; }
+    .pttr-error-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0 18px; border:1px solid var(--r-accent); border-radius:6px; color:var(--r-surface); background:var(--r-accent); cursor:pointer; text-decoration:none; font-size:12px; font-weight:720; }
+    .pttr-error-action:hover { filter:brightness(.94); }
+    .pttr-error-retry { min-height:44px; padding:0 18px; border:1px solid var(--r-border); border-radius:6px; color:var(--r-muted); background:transparent; cursor:pointer; font-size:12px; font-weight:650; }
+    .pttr-error-action:focus-visible, .pttr-error-retry:focus-visible { outline:2px solid var(--r-accent); outline-offset:3px; }
     .pttr-toast { position:fixed; left:50%; bottom:22px; z-index:80; transform:translate(-50%,16px); opacity:0; pointer-events:none; padding:9px 14px; border-radius:6px; color:var(--r-surface); background:var(--r-text); box-shadow:var(--r-shadow); font-size:12px; transition:opacity .2s ease,transform .2s ease; } .pttr-toast.show { opacity:1; transform:translate(-50%,0); }
     @media (max-width:1180px) { .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:minmax(0,1fr); } .pttr-rail { display:none; } .pttr-view { max-width:960px; } }
     @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { padding:0 12px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px 56px; } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px 70px; } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
@@ -262,7 +272,7 @@
 
   function init() {
     try {
-      const initial = parsePage(document, location.href);
+      const initial = parsePage(document, location.href) || parseNotFoundPage(document, location.href);
       if (!initial) {
         document.documentElement.classList.remove('pttr-preload');
         return;
@@ -470,8 +480,30 @@
     return null;
   }
 
+  function parseNotFoundPage(doc, pageUrl) {
+    const marker = clean(doc.querySelector('.bbs-content')?.textContent || doc.body?.textContent);
+    if (!/^404(?:\s|-|$)/i.test(clean(doc.title)) && !/404\s*-\s*Not Found/i.test(marker)) return null;
+    const url = new URL(pageUrl, location.origin);
+    const encodedBoard = url.pathname.match(/^\/bbs\/([^/]+)/)?.[1] || '';
+    if (!encodedBoard) return null;
+    let board = encodedBoard;
+    try { board = decodeURIComponent(encodedBoard); } catch (_) {}
+    const boardUrl = new URL(`/bbs/${encodeURIComponent(board)}/index.html`, url.origin).href;
+    return {
+      type: 'error',
+      kind: 'not-found',
+      board,
+      boardUrl,
+      requestedUrl: url.href
+    };
+  }
+
   function renderCurrent(resetScroll = true) {
     if (!state.model) return;
+    if (state.model.type === 'error') {
+      renderNotFound(state.model, resetScroll);
+      return;
+    }
     view.removeAttribute('aria-busy');
     app.classList.toggle('board-mode', state.model.type === 'board');
     applyPreferences();
@@ -487,6 +519,29 @@
       ? `${translate(state.model.title)} · ${state.model.board} · PTT Reader`
       : `${state.model.board} · ${text('reader')}`;
     if (state.model.type === 'board') requestAnimationFrame(maybeLoadMore);
+  }
+
+  function renderNotFound(model, resetScroll = true) {
+    view.removeAttribute('aria-busy');
+    app.classList.remove('board-mode');
+    applyPreferences();
+    renderChrome();
+    rail.replaceChildren();
+    updateSettings();
+    const actionLabel = text('backLatest').replace('{board}', model.board);
+    view.className = 'pttr-view';
+    view.innerHTML = `
+      <section class="pttr-error" aria-labelledby="pttr-error-title">
+        <p class="pttr-error-code">404 · PTT</p>
+        <h2 id="pttr-error-title">${escapeHtml(text('notFoundTitle'))}</h2>
+        <p>${escapeHtml(text('notFoundDetail'))}</p>
+        <div class="pttr-error-actions">
+          <a class="pttr-error-action" href="${escapeAttr(model.boardUrl)}" data-pttr-nav>← ${escapeHtml(actionLabel)}</a>
+        </div>
+      </section>`;
+    if (resetScroll) mainScroller.scrollTop = 0;
+    updateReadingProgress();
+    document.title = `404 · ${model.board} · PTT Reader`;
   }
 
   function renderChrome() {
@@ -668,7 +723,7 @@
   }
 
   function cacheCurrentPage() {
-    if (!state.model || !mainScroller) return;
+    if (!state.model || !mainScroller || !['board', 'article'].includes(state.model.type)) return;
     const key = pageKey(state.url);
     state.pageCache.delete(key);
     state.pageCache.set(key, {
@@ -823,10 +878,20 @@
     showLoading();
     try {
       const response = await fetch(target.href, { credentials: 'include', signal: controller.signal, headers: { 'X-Requested-With': 'PTT-Reader' } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const html = await response.text();
       if (requestId !== state.requestId) return;
       const doc = new DOMParser().parseFromString(html, 'text/html');
+      if (response.status === 404) {
+        const missing = parseNotFoundPage(doc, response.url || target.href);
+        if (!missing) throw new Error('HTTP 404');
+        state.model = missing;
+        state.url = target.href;
+        resetInfiniteState();
+        if (push) history.pushState({ pttr: true }, '', target.href);
+        renderCurrent();
+        return;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       if (doc.querySelector('.over18-notice')) {
         document.cookie = 'over18=1; path=/; domain=.ptt.cc; max-age=31536000; SameSite=Lax';
         throw new Error('Age cookie was rejected');
@@ -867,7 +932,7 @@
   function showError(error) {
     view.removeAttribute('aria-busy');
     view.className = 'pttr-view';
-    view.innerHTML = `<div class="pttr-error"><h2>${escapeHtml(text('loadError'))}</h2><p>${escapeHtml(error.message || '')}</p><button type="button" data-pttr-retry>${escapeHtml(text('retry'))}</button></div>`;
+    view.innerHTML = `<div class="pttr-error"><h2>${escapeHtml(text('loadError'))}</h2><p>${escapeHtml(error.message || '')}</p><div class="pttr-error-actions"><button class="pttr-error-retry" type="button" data-pttr-retry>${escapeHtml(text('retry'))}</button></div></div>`;
   }
 
   function updateReadingProgress() {
