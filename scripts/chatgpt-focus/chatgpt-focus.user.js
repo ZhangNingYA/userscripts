@@ -3,7 +3,7 @@
 // @name:zh-CN   ChatGPT 专注模式
 // @name:en      ChatGPT Focus
 // @namespace    https://scripts.fulafu.com/
-// @version      1.6.0
+// @version      1.7.0
 // @description  A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.
 // @description:zh-CN 为 ChatGPT 提供最近对话、移动导航、正文阅读排版和字号控制，同时保留模型、附件与下载功能。
 // @description:en A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.
@@ -21,8 +21,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.6.0';
-    const SCRIPT_RELEASED_AT = '2026-08-17 14:43:24 UTC+8';
+    const SCRIPT_VERSION = '1.7.0';
+    const SCRIPT_RELEASED_AT = '2026-08-17 18:11:58 UTC+8';
     const SIDEBAR_ID = 'cgpt-focus-sidebar';
     const MOBILE_TOGGLE_ID = 'cgpt-focus-mobile-toggle';
     const BACKDROP_ID = 'cgpt-focus-backdrop';
@@ -410,10 +410,28 @@
         }
 
         #${SIDEBAR_ID} .cgpt-focus-recent-status {
+            margin: 0;
             padding: 12px 10px;
             color: var(--text-secondary, rgba(32, 33, 35, .58));
             font-size: 11px;
             line-height: 1.5;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-recent-retry {
+            min-height: 36px;
+            margin: 0 10px 10px;
+            padding: 0 12px;
+            color: inherit;
+            background: transparent;
+            border: 1px solid var(--border-medium, rgba(0, 0, 0, .15));
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 650;
+        }
+
+        #${SIDEBAR_ID} .cgpt-focus-recent-retry:hover {
+            background: var(--sidebar-surface-secondary, var(--token-sidebar-surface-secondary, rgba(0, 0, 0, .06)));
         }
 
         #${SIDEBAR_ID} button:focus-visible,
@@ -523,6 +541,10 @@
             #${SIDEBAR_ID} .cgpt-focus-font-button {
                 width: 44px;
                 height: 44px;
+            }
+
+            #${SIDEBAR_ID} .cgpt-focus-recent-retry {
+                min-height: 44px;
             }
 
             #${SIDEBAR_ID} .cgpt-focus-chat {
@@ -1385,6 +1407,88 @@
         return merged;
     }
 
+    function findNativeSidebarControl() {
+        return Array.from(document.querySelectorAll([
+            '.cgpt-focus-native-sidebar-control',
+            'header button',
+            'header a[role="button"]',
+            'button[data-testid*="sidebar" i]',
+            'a[role="button"][data-testid*="sidebar" i]',
+            'button[aria-label*="sidebar" i]',
+            'button[aria-label*="侧边栏" i]',
+            'button[aria-label*="边栏" i]'
+        ].join(','))).find((control) => {
+            if (control.closest(`#${SIDEBAR_ID}`)) {
+                return false;
+            }
+            const identity = [
+                control.id,
+                control.getAttribute('data-testid'),
+                control.getAttribute('aria-label'),
+                control.getAttribute('title')
+            ].filter(Boolean).join(' ');
+            return /(?:^|[\s_-])sidebar(?:$|[\s_-])|侧边栏|边栏/i.test(identity);
+        }) || null;
+    }
+
+    function waitForNativeRecent(timeout = 2400) {
+        return new Promise((resolve) => {
+            let timer = 0;
+            let observer = null;
+            const finish = (recent) => {
+                observer?.disconnect();
+                window.clearTimeout(timer);
+                resolve(recent);
+            };
+            observer = new MutationObserver(() => {
+                const recent = collectRecentLinks();
+                if (recent.length) {
+                    finish(recent);
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            const immediate = collectRecentLinks();
+            if (immediate.length) {
+                finish(immediate);
+                return;
+            }
+            timer = window.setTimeout(() => finish(collectRecentLinks()), timeout);
+        });
+    }
+
+    let nativeRecentRequest = null;
+
+    function hydrateRecentFromNative() {
+        const existing = collectRecentLinks();
+        if (existing.length || nativeRecentRequest) {
+            return nativeRecentRequest || Promise.resolve(existing);
+        }
+
+        const control = findNativeSidebarControl();
+        if (!control) {
+            return Promise.resolve([]);
+        }
+
+        nativeRecentRequest = (async () => {
+            const wasExpanded = control.getAttribute('aria-expanded') === 'true';
+            try {
+                control.click();
+                return await waitForNativeRecent();
+            } finally {
+                if (!wasExpanded) {
+                    const closeControl = control.isConnected ? control : findNativeSidebarControl();
+                    if (closeControl && closeControl.getAttribute('aria-expanded') !== 'false') {
+                        closeControl.click();
+                    }
+                }
+                nativeRecentRequest = null;
+                scheduleRefresh(0);
+            }
+        })();
+
+        return nativeRecentRequest;
+    }
+
     function parseRecentResponse(payload) {
         const source = Array.isArray(payload && payload.items)
             ? payload.items
@@ -1409,6 +1513,92 @@
     let recentRequest = null;
     let recentLastAttemptAt = 0;
     let recentState = 'loading';
+    let recentFailure = '';
+    let recentAccessToken = '';
+    let recentAccessTokenExpiresAt = 0;
+
+    function makeRecentError(message, status = 0) {
+        const error = new Error(message);
+        error.status = status;
+        return error;
+    }
+
+    function describeRecentFailure(error) {
+        if (error && error.name === 'AbortError') {
+            return { state: 'timeout', message: '读取超时，请重试' };
+        }
+        if (error && error.status === 401) {
+            return { state: 'signed-out', message: '登录状态已失效，请重新登录 ChatGPT' };
+        }
+        if (error && error.status === 403) {
+            return { state: 'blocked', message: '浏览器限制了历史记录读取，请重试' };
+        }
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return { state: 'offline', message: '网络已断开，恢复后重试' };
+        }
+        return { state: 'unavailable', message: '最近对话读取失败，请重试' };
+    }
+
+    async function requestRecentAccessToken(signal) {
+        if (recentAccessToken && Date.now() < recentAccessTokenExpiresAt) {
+            return recentAccessToken;
+        }
+
+        const response = await window.fetch(new URL('/api/auth/session', location.origin), {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+            signal
+        });
+        if (!response.ok) {
+            throw makeRecentError(`Session request failed with HTTP ${response.status}`, response.status);
+        }
+
+        const session = await response.json();
+        const token = typeof session?.accessToken === 'string'
+            ? session.accessToken
+            : (typeof session?.access_token === 'string' ? session.access_token : '');
+        if (!token) {
+            throw makeRecentError('The current ChatGPT session did not provide an access token', 401);
+        }
+        recentAccessToken = token;
+        recentAccessTokenExpiresAt = Date.now() + 50 * 60 * 1000;
+        return token;
+    }
+
+    function requestRecentResponse(signal, token = '') {
+        const url = new URL('/backend-api/conversations', location.origin);
+        url.searchParams.set('offset', '0');
+        url.searchParams.set('limit', String(MAX_RECENT));
+        url.searchParams.set('order', 'updated');
+        url.searchParams.set('is_archived', 'false');
+        const headers = { Accept: 'application/json' };
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+        return window.fetch(url, {
+            credentials: 'include',
+            cache: 'no-store',
+            headers,
+            signal
+        });
+    }
+
+    async function requestRecentPayload(signal) {
+        let token = Date.now() < recentAccessTokenExpiresAt ? recentAccessToken : '';
+        let response = await requestRecentResponse(signal, token);
+
+        if (response.status === 401 || response.status === 403) {
+            recentAccessToken = '';
+            recentAccessTokenExpiresAt = 0;
+            token = await requestRecentAccessToken(signal);
+            response = await requestRecentResponse(signal, token);
+        }
+        if (!response.ok) {
+            throw makeRecentError(`Recent chats request failed with HTTP ${response.status}`, response.status);
+        }
+        return response.json();
+    }
 
     async function refreshRecentFromApi(force = false) {
         if (!isChatRoute() || typeof window.fetch !== 'function') {
@@ -1423,38 +1613,28 @@
 
         recentLastAttemptAt = Date.now();
         recentState = 'loading';
+        recentFailure = '';
         renderRecent(readCache(), recentState);
 
         recentRequest = (async () => {
             const controller = typeof AbortController === 'function' ? new AbortController() : null;
             const timeout = controller ? window.setTimeout(() => controller.abort(), 8000) : 0;
             try {
-                const url = new URL('/backend-api/conversations', location.origin);
-                url.searchParams.set('offset', '0');
-                url.searchParams.set('limit', String(MAX_RECENT));
-                url.searchParams.set('order', 'updated');
-                url.searchParams.set('is_archived', 'false');
-                const response = await window.fetch(url, {
-                    credentials: 'include',
-                    cache: 'no-store',
-                    headers: { Accept: 'application/json' },
-                    signal: controller ? controller.signal : undefined
-                });
-                if (!response.ok) {
-                    throw new Error(`Recent chats request failed with HTTP ${response.status}`);
-                }
-
-                const apiItems = parseRecentResponse(await response.json());
+                const payload = await requestRecentPayload(controller ? controller.signal : undefined);
+                const apiItems = parseRecentResponse(payload);
                 const recent = mergeRecent(apiItems, collectRecentLinks(), readCache());
                 if (recent.length) {
                     writeCache(recent);
                 }
                 recentState = recent.length ? 'ready' : 'empty';
+                recentFailure = '';
                 renderRecent(recent, recentState);
                 return recent;
-            } catch {
-                const fallback = collectRecentLinks();
-                recentState = fallback.length ? 'ready' : 'unavailable';
+            } catch (error) {
+                const fallback = await hydrateRecentFromNative();
+                const failure = describeRecentFailure(error);
+                recentState = fallback.length ? 'ready' : failure.state;
+                recentFailure = fallback.length ? '' : failure.message;
                 renderRecent(fallback, recentState);
                 return fallback;
             } finally {
@@ -1633,7 +1813,7 @@
         }
 
         const currentPath = normalizePath(location.pathname);
-        const signature = JSON.stringify([state, ...items.map((item) => [item.path, item.title, item.path === currentPath])]);
+        const signature = JSON.stringify([state, recentFailure, ...items.map((item) => [item.path, item.title, item.path === currentPath])]);
         if (list.dataset.signature === signature) {
             return;
         }
@@ -1642,12 +1822,24 @@
         if (!items.length) {
             const status = document.createElement('p');
             status.className = 'cgpt-focus-recent-status';
-            status.textContent = {
+            status.textContent = recentFailure || {
                 loading: '正在读取最近对话…',
                 empty: '暂无最近对话',
-                unavailable: '最近对话暂不可用'
+                unavailable: '最近对话读取失败，请重试'
             }[state] || '暂无最近对话';
             fragment.appendChild(status);
+
+            if (!['loading', 'empty'].includes(state)) {
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'cgpt-focus-recent-retry';
+                retry.textContent = '重新读取';
+                retry.addEventListener('click', () => {
+                    recentLastAttemptAt = 0;
+                    void refreshRecentFromApi(true);
+                });
+                fragment.appendChild(retry);
+            }
         }
         for (const item of items.slice(0, MAX_RECENT)) {
             const link = document.createElement('a');
