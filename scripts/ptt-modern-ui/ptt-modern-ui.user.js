@@ -2,9 +2,9 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.4.3
-// @description  將 PTT 轉換為現代化瀑布流 SPA 閱讀器，支援無限滾動、頁面狀態還原與閱讀設定
-// @description:en Transform PTT into a modern waterfall-style SPA reader with infinite scrolling, navigation state restoration, and reading preferences
+// @version      2.5.0
+// @description  將 PTT 轉換為最新優先的瀑布流 SPA 閱讀器，支援向下無限載入、頁面狀態還原與閱讀設定
+// @description:en Transform PTT into a modern latest-first waterfall reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
 // @homepageURL  https://scripts.fulafu.com/scripts/ptt-modern-ui/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
@@ -19,8 +19,8 @@
 (function () {
   'use strict';
 
-  const SCRIPT_VERSION = '2.4.3';
-  const SCRIPT_RELEASED_AT = '2026-08-17 12:33:23 UTC+8';
+  const SCRIPT_VERSION = '2.5.0';
+  const SCRIPT_RELEASED_AT = '2026-08-17 13:17:41 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -75,23 +75,21 @@
 
   const copySets = {
     'zh-CN': {
-      reader: 'PTT 阅读器', board: '看板', articles: '文章列表', latest: '最新文章', previous: '上一页', next: '下一页', oldest: '最早',
-      search: '搜索文章', searchResults: '搜索结果', pageOverview: '本页概览', stories: '文章', active: '高讨论', categories: '主题分布', authors: '活跃作者',
+      reader: 'PTT 阅读器', board: '看板', articles: '文章列表', search: '搜索文章', searchResults: '搜索结果', stories: '文章',
       allDiscussions: '按时间排列的最新讨论', by: '作者', replies: '讨论', readingTime: '阅读时间', minute: '分钟', characters: '字', articleInfo: '文章信息',
       backBoard: '返回看板', original: '原始页面', settings: '阅读设置', releasedAt: '发布于', language: '文字语言', traditional: '繁体', simplified: '简体', appearance: '阅读背景',
       paper: '白纸', ink: '墨夜', mist: '雾蓝', rose: '柔灰', fontSize: '正文字号', smaller: '减小字号', larger: '增大字号',
       up: '推', neutral: '箭头', down: '嘘', progress: '阅读进度', loading: '正在读取 PTT', retry: '重新载入', loadError: '页面读取失败',
-      noStories: '本页没有可显示的文章', deleted: '文章已删除', hot: '热', pinned: '置顶', page: '页', openMenu: '打开导航', close: '关闭', discussion: '讨论区',
+      noStories: '本页没有可显示的文章', deleted: '文章已删除', hot: '热', pinned: '置顶', close: '关闭', discussion: '讨论区',
       loadingMore: '正在加载更多文章', noMore: '没有更多文章了', loadMoreFailed: '加载失败，继续下滑重试'
     },
     'zh-TW': {
-      reader: 'PTT 閱讀器', board: '看板', articles: '文章列表', latest: '最新文章', previous: '上一頁', next: '下一頁', oldest: '最早',
-      search: '搜尋文章', searchResults: '搜尋結果', pageOverview: '本頁概覽', stories: '文章', active: '高討論', categories: '主題分布', authors: '活躍作者',
+      reader: 'PTT 閱讀器', board: '看板', articles: '文章列表', search: '搜尋文章', searchResults: '搜尋結果', stories: '文章',
       allDiscussions: '按時間排列的最新討論', by: '作者', replies: '討論', readingTime: '閱讀時間', minute: '分鐘', characters: '字', articleInfo: '文章資訊',
       backBoard: '返回看板', original: '原始頁面', settings: '閱讀設定', releasedAt: '發佈於', language: '文字語言', traditional: '繁體', simplified: '簡體', appearance: '閱讀背景',
       paper: '白紙', ink: '墨夜', mist: '霧藍', rose: '柔灰', fontSize: '正文字號', smaller: '減小字號', larger: '增大字號',
       up: '推', neutral: '箭頭', down: '噓', progress: '閱讀進度', loading: '正在讀取 PTT', retry: '重新載入', loadError: '頁面讀取失敗',
-      noStories: '本頁沒有可顯示的文章', deleted: '文章已刪除', hot: '熱門', pinned: '置頂', page: '頁', openMenu: '開啟導覽', close: '關閉', discussion: '討論區',
+      noStories: '本頁沒有可顯示的文章', deleted: '文章已刪除', hot: '熱門', pinned: '置頂', close: '關閉', discussion: '討論區',
       loadingMore: '正在載入更多文章', noMore: '沒有更多文章了', loadMoreFailed: '載入失敗，繼續下滑重試'
     }
   };
@@ -109,32 +107,22 @@
     #ptt-reader-app button, #ptt-reader-app input { font:inherit; }
     #ptt-reader-app button, #ptt-reader-app a { -webkit-tap-highlight-color:transparent; }
     .pttr-header { height:64px; display:flex; align-items:center; position:relative; z-index:30; background:var(--r-surface); border-bottom:1px solid var(--r-border); }
-    .pttr-brand { width:236px; height:100%; flex:0 0 236px; display:flex; align-items:center; gap:11px; padding:0 20px; color:var(--r-text); text-decoration:none; border-right:1px solid var(--r-border); }
+    .pttr-brand { height:100%; flex:0 0 auto; display:flex; align-items:center; gap:11px; padding:0 20px; color:var(--r-text); text-decoration:none; border-right:1px solid var(--r-border); }
     .pttr-brand-mark { width:32px; height:32px; display:grid; place-items:center; border-radius:6px; color:#fff; background:var(--r-accent); font-size:16px; font-weight:800; }
     .pttr-brand-copy { display:flex; flex-direction:column; line-height:1.15; } .pttr-brand-copy strong { font-size:14px; } .pttr-brand-copy span { color:var(--r-muted); font-size:11px; margin-top:3px; }
-    .pttr-mobile-menu { display:none!important; }
     .pttr-header-location { min-width:0; display:flex; align-items:center; gap:8px; padding:0 24px; color:var(--r-muted); }
     .pttr-header-location span { font-size:12px; } .pttr-header-location strong { min-width:0; max-width:360px; color:var(--r-text); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .pttr-header-actions { margin-left:auto; display:flex; align-items:center; gap:6px; padding:0 18px; }
     .pttr-icon-button { width:38px; height:38px; display:grid; place-items:center; flex:0 0 38px; padding:0; border:1px solid transparent; border-radius:7px; color:var(--r-muted); background:transparent; cursor:pointer; text-decoration:none; font-weight:700; }
     .pttr-icon-button:hover { color:var(--r-text); background:var(--r-subtle); border-color:var(--r-border); }
     @keyframes pttr-spin { to { transform:rotate(360deg); } }
-    .pttr-icon-button:focus-visible, .pttr-nav-link:focus-visible, .pttr-story:focus-visible, .pttr-pagination a:focus-visible, .pttr-segment button:focus-visible, .pttr-theme-option:focus-visible { outline:2px solid var(--r-accent); outline-offset:2px; }
+    .pttr-icon-button:focus-visible, .pttr-story:focus-visible, .pttr-segment button:focus-visible, .pttr-theme-option:focus-visible { outline:2px solid var(--r-accent); outline-offset:2px; }
     .pttr-top-progress { position:absolute; left:0; right:0; bottom:-1px; height:2px; overflow:hidden; pointer-events:none; }
     .pttr-top-progress span { display:block; width:0; height:100%; background:var(--r-accent); transition:width .12s linear; }
-    .pttr-layout { display:grid; grid-template-columns:236px minmax(0,1fr) 252px; height:calc(100vh - 64px); min-height:0; }
-    #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:236px minmax(0,1fr); }
+    .pttr-layout { display:grid; grid-template-columns:minmax(0,1fr) 252px; height:calc(100vh - 64px); min-height:0; }
+    #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:minmax(0,1fr); }
     #ptt-reader-app.board-mode .pttr-rail { display:none; }
-    .pttr-sidebar { min-width:0; display:flex; flex-direction:column; padding:28px 18px 18px; background:var(--r-surface); border-right:1px solid var(--r-border); overflow-y:auto; }
-    .pttr-board-identity { padding:0 8px 25px; border-bottom:1px solid var(--r-border); }
     .pttr-eyebrow { margin:0 0 7px; color:var(--r-accent); font-size:11px; font-weight:750; text-transform:uppercase; }
-    .pttr-board-identity h2 { margin:0; font-size:22px; line-height:1.2; overflow-wrap:anywhere; }
-    .pttr-board-identity p { margin:7px 0 0; color:var(--r-muted); font-size:12px; }
-    .pttr-nav-group { padding:20px 0 0; } .pttr-nav-label { display:block; padding:0 10px 7px; color:var(--r-faint); font-size:11px; font-weight:650; }
-    .pttr-nav-link { min-height:40px; display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:6px; color:var(--r-muted); text-decoration:none; }
-    .pttr-nav-link:hover { color:var(--r-text); background:var(--r-subtle); } .pttr-nav-link.active { color:var(--r-accent); background:var(--r-accent-soft); font-weight:700; }
-    .pttr-nav-symbol { width:20px; color:inherit; text-align:center; font-size:15px; }
-    .pttr-sidebar-footer { margin-top:auto; padding:18px 10px 0; color:var(--r-faint); font-size:11px; border-top:1px solid var(--r-border); }
     .pttr-main { min-width:0; min-height:0; overflow-y:auto; overflow-anchor:none; scroll-behavior:smooth; scrollbar-color:var(--r-border) transparent; }
     .pttr-view { width:min(100%,1040px); margin:0 auto; padding:44px 44px 72px; }
     #ptt-reader-app.board-mode .pttr-view { width:min(100%,1320px); padding:34px 38px 72px; }
@@ -144,11 +132,8 @@
     .pttr-search { width:280px; flex:0 0 280px; position:relative; }
     .pttr-search input { width:100%; height:42px; padding:0 12px; border:1px solid var(--r-border); border-radius:7px; color:var(--r-text); background:var(--r-surface); outline:none; }
     .pttr-search input:focus { border-color:var(--r-accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--r-accent) 16%,transparent); }
-    .pttr-list-toolbar { min-height:46px; display:flex; align-items:center; justify-content:space-between; gap:16px; color:var(--r-muted); border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); }
+    .pttr-list-toolbar { min-height:46px; display:flex; align-items:center; color:var(--r-muted); border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); }
     .pttr-count { font-size:12px; } .pttr-count strong { color:var(--r-text); }
-    .pttr-pagination { display:flex; align-items:center; gap:4px; }
-    .pttr-pagination a, .pttr-pagination span { min-width:34px; height:32px; display:flex; align-items:center; justify-content:center; padding:0 9px; border-radius:6px; color:var(--r-muted); text-decoration:none; font-size:12px; }
-    .pttr-pagination a:hover { color:var(--r-accent); background:var(--r-accent-soft); } .pttr-pagination .disabled { color:var(--r-faint); opacity:.45; }
     .pttr-story-list { columns:250px auto; column-gap:16px; padding-top:18px; }
     .pttr-story { width:100%; display:inline-block; break-inside:avoid; margin:0 0 16px; overflow:hidden; color:inherit; text-decoration:none; vertical-align:top; border:1px solid var(--r-border); border-radius:8px; background:var(--r-surface); box-shadow:0 2px 8px rgba(28,38,33,.04); transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
     .pttr-story:hover { transform:translateY(-3px); border-color:color-mix(in srgb,var(--r-accent) 42%,var(--r-border)); box-shadow:var(--r-shadow); }
@@ -167,7 +152,6 @@
     .pttr-story-author strong { min-width:0; max-width:95px; overflow:hidden; color:var(--r-muted); font-size:11px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
     .pttr-story-engagement { flex:0 0 auto; display:flex; align-items:center; gap:7px; color:var(--r-faint); font-size:10px; }
     .pttr-story-score { color:var(--r-muted); font-size:11px; font-weight:700; } .pttr-story-score.hot, .pttr-story-score.negative { color:var(--r-hot); }
-    .pttr-bottom-pagination { display:flex; justify-content:flex-end; padding-top:24px; }
     .pttr-infinite-status { min-height:54px; display:flex; align-items:center; justify-content:center; gap:9px; padding:18px 0 4px; color:var(--r-faint); font-size:11px; }
     .pttr-infinite-status.loading::before { content:""; width:14px; height:14px; border:2px solid var(--r-border); border-top-color:var(--r-accent); border-radius:50%; animation:pttr-spin .8s linear infinite; }
     .pttr-infinite-status.error { color:var(--r-hot); }
@@ -217,10 +201,9 @@
     .pttr-loading { padding:34px 0; } .pttr-skeleton { height:82px; border-bottom:1px solid var(--r-border); background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--r-surface) 80%,transparent),transparent); background-size:220% 100%; animation:pttr-shimmer 1.2s linear infinite; } @keyframes pttr-shimmer { to { background-position:-220% 0; } }
     .pttr-error { max-width:520px; margin:80px auto; padding:28px 0; text-align:center; border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); } .pttr-error h2 { margin:0 0 8px; font-size:18px; } .pttr-error p { margin:0 0 18px; color:var(--r-muted); } .pttr-error button { min-height:38px; padding:0 15px; border:1px solid var(--r-accent); border-radius:6px; color:var(--r-accent); background:transparent; cursor:pointer; }
     .pttr-toast { position:fixed; left:50%; bottom:22px; z-index:80; transform:translate(-50%,16px); opacity:0; pointer-events:none; padding:9px 14px; border-radius:6px; color:var(--r-surface); background:var(--r-text); box-shadow:var(--r-shadow); font-size:12px; transition:opacity .2s ease,transform .2s ease; } .pttr-toast.show { opacity:1; transform:translate(-50%,0); }
-    .pttr-sidebar-scrim { display:none; padding:0; border:0; }
-    @media (max-width:1180px) { .pttr-layout { grid-template-columns:220px minmax(0,1fr); } #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:220px minmax(0,1fr); } .pttr-brand { width:220px; flex-basis:220px; } .pttr-rail { display:none; } .pttr-view { max-width:960px; } }
-    @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { width:auto; flex:0 0 auto; padding:0 12px 0 5px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-mobile-menu { display:grid!important; margin-left:7px; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-sidebar { width:260px; position:fixed; z-index:50; top:58px; bottom:0; left:0; transform:translateX(-100%); transition:transform .2s ease; box-shadow:var(--r-shadow); } #ptt-reader-app.nav-open .pttr-sidebar { transform:translateX(0); } .pttr-sidebar-scrim { position:fixed; z-index:45; inset:58px 0 0; background:rgba(0,0,0,.28); } #ptt-reader-app.nav-open .pttr-sidebar-scrim { display:block; } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px 56px; } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px 70px; } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
-    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px 50px; } .pttr-story-list { columns:2; column-gap:10px; padding-top:12px; } .pttr-story { margin-bottom:10px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-pagination a, .pttr-pagination span { min-width:30px; padding:0 6px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
+    @media (max-width:1180px) { .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:minmax(0,1fr); } .pttr-rail { display:none; } .pttr-view { max-width:960px; } }
+    @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { padding:0 12px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px 56px; } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px 70px; } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
+    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px 50px; } .pttr-story-list { columns:2; column-gap:10px; padding-top:12px; } .pttr-story { margin-bottom:10px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
     @media (prefers-reduced-motion:reduce) { #ptt-reader-app *, #ptt-reader-app *::before, #ptt-reader-app *::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
   `;
 
@@ -287,6 +270,13 @@
       resetInfiniteState();
       buildShell();
       bindEvents();
+      const latestUrl = canonicalBoardUrl(location.href);
+      if (initial.type === 'board' && !initial.query && latestUrl.href !== location.href) {
+        history.replaceState({ ...(history.state || {}), pttr: true }, '', latestUrl.href);
+        document.documentElement.classList.remove('pttr-preload');
+        navigate(latestUrl.href, false);
+        return;
+      }
       renderCurrent();
       history.replaceState({ ...(history.state || {}), pttr: true }, '', state.url);
       cacheCurrentPage();
@@ -302,7 +292,6 @@
     app.id = 'ptt-reader-app';
     app.innerHTML = `
       <header class="pttr-header">
-        <button class="pttr-icon-button pttr-mobile-menu" id="pttr-mobile-menu" type="button" title="Menu" aria-label="Menu">≡</button>
         <a class="pttr-brand" id="pttr-brand" href="#" data-pttr-nav>
           <span class="pttr-brand-mark">P</span>
           <span class="pttr-brand-copy"><strong id="pttr-reader-name"></strong><span>ptt.cc</span></span>
@@ -315,15 +304,9 @@
         <div class="pttr-top-progress"><span id="pttr-top-progress"></span></div>
       </header>
       <div class="pttr-layout">
-        <aside class="pttr-sidebar">
-          <div class="pttr-board-identity"><p class="pttr-eyebrow" id="pttr-sidebar-eyebrow"></p><h2 id="pttr-sidebar-board"></h2><p id="pttr-sidebar-caption"></p></div>
-          <nav class="pttr-nav-group" id="pttr-sidebar-nav"></nav>
-          <div class="pttr-sidebar-footer">PTT Web · Reader SPA</div>
-        </aside>
         <main class="pttr-main" id="pttr-main"><div class="pttr-view" id="pttr-view"></div></main>
         <aside class="pttr-rail" id="pttr-rail"></aside>
       </div>
-      <button class="pttr-sidebar-scrim" id="pttr-sidebar-scrim" type="button" aria-label="Close"></button>
       <aside class="pttr-settings" id="pttr-settings" hidden>
         <div class="pttr-settings-head"><div><h2 id="pttr-settings-title"></h2><p class="pttr-settings-release"><strong id="pttr-settings-version"></strong><span id="pttr-settings-released-at"></span></p></div><button class="pttr-settings-close" id="pttr-settings-close" type="button" aria-label="Close">×</button></div>
         <div class="pttr-setting-group"><span class="pttr-setting-label" id="pttr-language-label"></span><div class="pttr-segment"><button type="button" data-lang="zh-TW"></button><button type="button" data-lang="zh-CN"></button></div></div>
@@ -359,8 +342,6 @@
       }
       if (event.target.closest('#pttr-settings-button')) toggleSettings();
       if (event.target.closest('#pttr-settings-close')) toggleSettings(false);
-      if (event.target.closest('#pttr-mobile-menu')) app.classList.toggle('nav-open');
-      if (event.target.closest('#pttr-sidebar-scrim')) app.classList.remove('nav-open');
       const langButton = event.target.closest('[data-lang]');
       if (langButton) setLanguage(langButton.dataset.lang);
       const themeButton = event.target.closest('[data-theme]');
@@ -491,7 +472,6 @@
     renderChrome();
     if (state.model.type === 'board') renderBoard(state.model);
     else renderArticle(state.model);
-    renderSidebar(state.model);
     renderRail(state.model);
     updateSettings();
     decorateContentLinks(view);
@@ -513,21 +493,6 @@
     app.querySelector('#pttr-original-link').href = originalUrl(state.url);
     app.querySelector('#pttr-original-link').title = text('original');
     app.querySelector('#pttr-settings-button').title = text('settings');
-    app.querySelector('#pttr-mobile-menu').title = text('openMenu');
-    app.querySelector('#pttr-mobile-menu').setAttribute('aria-label', text('openMenu'));
-  }
-
-  function renderSidebar(model) {
-    app.querySelector('#pttr-sidebar-eyebrow').textContent = text('board');
-    app.querySelector('#pttr-sidebar-board').textContent = model.board;
-    app.querySelector('#pttr-sidebar-caption').textContent = model.type === 'article' ? text('articleInfo') : `${model.stories.length} ${text('stories')}`;
-    const links = [
-      { href: model.boardUrl, symbol: '≡', label: text('latest'), active: model.type === 'board' && !model.pageNumber && !model.query },
-      model.pagination?.previous ? { href: model.pagination.previous, symbol: '←', label: text('previous') } : null,
-      model.pagination?.next ? { href: model.pagination.next, symbol: '→', label: text('next') } : null,
-      model.pagination?.oldest ? { href: model.pagination.oldest, symbol: '|←', label: text('oldest') } : null
-    ].filter(Boolean);
-    app.querySelector('#pttr-sidebar-nav').innerHTML = `<span class="pttr-nav-label">${escapeHtml(text('articles'))}</span>${links.map((link) => `<a class="pttr-nav-link${link.active ? ' active' : ''}" href="${escapeAttr(link.href)}" data-pttr-nav><span class="pttr-nav-symbol">${link.symbol}</span><span>${escapeHtml(link.label)}</span></a>`).join('')}`;
   }
 
   function renderBoard(model) {
@@ -539,10 +504,9 @@
           <div><p class="pttr-eyebrow">${escapeHtml(model.board)}${model.pageNumber ? ` · ${escapeHtml(text('page'))} ${escapeHtml(model.pageNumber)}` : ''}</p><h1>${escapeHtml(heading)}</h1><p class="pttr-view-subtitle">${escapeHtml(model.query ? `“${model.query}”` : text('allDiscussions'))}</p></div>
           <form class="pttr-search" id="pttr-search-form"><input name="q" type="search" value="${escapeAttr(model.query || '')}" placeholder="${escapeAttr(text('search'))}" aria-label="${escapeAttr(text('search'))}"></form>
         </header>
-        <div class="pttr-list-toolbar"><div class="pttr-count"><strong>${model.stories.length}</strong> ${escapeHtml(text('stories'))}</div>${paginationHtml(model.pagination)}</div>
+        <div class="pttr-list-toolbar"><div class="pttr-count"><strong>${model.stories.length}</strong> ${escapeHtml(text('stories'))}</div></div>
         ${model.stories.length ? `<div class="pttr-story-list">${model.stories.map(storyHtml).join('')}</div>` : `<div class="pttr-empty">${escapeHtml(text('noStories'))}</div>`}
         <div class="pttr-infinite-status${state.infiniteLoading ? ' loading' : ''}${state.infiniteError ? ' error' : ''}" id="pttr-infinite-status" role="status">${escapeHtml(infiniteStatusText())}</div>
-        <div class="pttr-bottom-pagination">${paginationHtml(model.pagination)}</div>
       </section>`;
   }
 
@@ -576,13 +540,6 @@
     return hash >>> 0;
   }
 
-  function paginationHtml(pagination = {}) {
-    const item = (href, label, symbol) => href
-      ? `<a href="${escapeAttr(href)}" data-pttr-nav title="${escapeAttr(label)}">${symbol}</a>`
-      : `<span class="disabled">${symbol}</span>`;
-    return `<nav class="pttr-pagination" aria-label="Pagination">${item(pagination.oldest, text('oldest'), '|←')}${item(pagination.previous, text('previous'), '←')}${item(pagination.next, text('next'), '→')}${item(pagination.latest, text('latest'), '→|')}</nav>`;
-  }
-
   function renderArticle(model) {
     const counts = reactionCounts(model.pushes);
     view.className = 'pttr-article-view';
@@ -610,16 +567,7 @@
 
   function renderRail(model) {
     if (model.type === 'board') {
-      const categoryCounts = countBy(model.stories.map((story) => story.category || '其他'));
-      const authorCounts = countBy(model.stories.map((story) => story.author).filter((author) => author && author !== '—'));
-      const hotCount = model.stories.filter((story) => story.score === '爆' || Number(story.score) >= 20).length;
-      const categories = topEntries(categoryCounts, 4);
-      const authors = topEntries(authorCounts, 4);
-      const maxCategory = Math.max(1, ...categories.map((entry) => entry[1]));
-      rail.innerHTML = `
-        <section class="pttr-rail-section"><h2 class="pttr-rail-title">${escapeHtml(text('pageOverview'))}</h2><div class="pttr-stat-grid"><div class="pttr-stat"><strong>${model.stories.length}</strong><span>${escapeHtml(text('stories'))}</span></div><div class="pttr-stat"><strong>${hotCount}</strong><span>${escapeHtml(text('active'))}</span></div></div></section>
-        <section class="pttr-rail-section"><h2 class="pttr-rail-title">${escapeHtml(text('categories'))}</h2><div class="pttr-distribution">${categories.map(([name, count]) => `<div class="pttr-distribution-row"><div class="pttr-distribution-label"><span>${escapeHtml(translate(name))}</span><span>${count}</span></div><span></span><div class="pttr-mini-bar"><span style="width:${Math.round(count / maxCategory * 100)}%"></span></div></div>`).join('')}</div></section>
-        <section class="pttr-rail-section"><h2 class="pttr-rail-title">${escapeHtml(text('authors'))}</h2><div class="pttr-author-list">${authors.map(([name, count]) => `<div class="pttr-author"><span class="pttr-avatar">${escapeHtml(initial(name))}</span><div><strong>${escapeHtml(name)}</strong><span>${count} ${escapeHtml(text('stories'))}</span></div></div>`).join('')}</div></section>`;
+      rail.replaceChildren();
     } else {
       const counts = reactionCounts(model.pushes);
       rail.innerHTML = `
@@ -782,7 +730,7 @@
   }
 
   async function navigate(url, push, preferCache = false) {
-    const target = new URL(url, location.href);
+    const target = canonicalBoardUrl(url);
     if (target.origin !== location.origin || !target.pathname.startsWith('/bbs/')) {
       location.href = target.href;
       return;
@@ -871,7 +819,6 @@
 
   function closeOverlays() {
     toggleSettings(false);
-    app.classList.remove('nav-open');
   }
 
   function setLanguage(lang) {
@@ -996,17 +943,6 @@
     }, { up: 0, neutral: 0, down: 0 });
   }
 
-  function countBy(items) {
-    return items.reduce((map, item) => {
-      map[item] = (map[item] || 0) + 1;
-      return map;
-    }, {});
-  }
-
-  function topEntries(map, count) {
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, count);
-  }
-
   function originalUrl(value) {
     const url = new URL(value, location.href);
     url.searchParams.set('pttr', 'off');
@@ -1015,6 +951,16 @@
 
   function absoluteUrl(value, base) {
     try { return new URL(value || '', base).href; } catch (_) { return ''; }
+  }
+
+  function canonicalBoardUrl(value) {
+    const url = new URL(value, location.href);
+    const match = url.pathname.match(/^\/bbs\/([^/]+)\/index\d+\.html$/);
+    if (!match) return url;
+    url.pathname = `/bbs/${match[1]}/index.html`;
+    url.search = '';
+    url.hash = '';
+    return url;
   }
 
   function translate(value) {
