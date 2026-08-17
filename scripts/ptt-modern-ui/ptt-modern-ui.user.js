@@ -2,7 +2,7 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.4.2
+// @version      2.4.3
 // @description  將 PTT 轉換為現代化瀑布流 SPA 閱讀器，支援無限滾動、頁面狀態還原與閱讀設定
 // @description:en Transform PTT into a modern waterfall-style SPA reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
@@ -18,6 +18,9 @@
 
 (function () {
   'use strict';
+
+  const SCRIPT_VERSION = '2.4.3';
+  const SCRIPT_RELEASED_AT = '2026-08-17 12:33:23 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -75,7 +78,7 @@
       reader: 'PTT 阅读器', board: '看板', articles: '文章列表', latest: '最新文章', previous: '上一页', next: '下一页', oldest: '最早',
       search: '搜索文章', searchResults: '搜索结果', pageOverview: '本页概览', stories: '文章', active: '高讨论', categories: '主题分布', authors: '活跃作者',
       allDiscussions: '按时间排列的最新讨论', by: '作者', replies: '讨论', readingTime: '阅读时间', minute: '分钟', characters: '字', articleInfo: '文章信息',
-      backBoard: '返回看板', original: '原始页面', settings: '阅读设置', language: '文字语言', traditional: '繁体', simplified: '简体', appearance: '阅读背景',
+      backBoard: '返回看板', original: '原始页面', settings: '阅读设置', releasedAt: '发布于', language: '文字语言', traditional: '繁体', simplified: '简体', appearance: '阅读背景',
       paper: '白纸', ink: '墨夜', mist: '雾蓝', rose: '柔灰', fontSize: '正文字号', smaller: '减小字号', larger: '增大字号',
       up: '推', neutral: '箭头', down: '嘘', progress: '阅读进度', loading: '正在读取 PTT', retry: '重新载入', loadError: '页面读取失败',
       noStories: '本页没有可显示的文章', deleted: '文章已删除', hot: '热', pinned: '置顶', page: '页', openMenu: '打开导航', close: '关闭', discussion: '讨论区',
@@ -85,7 +88,7 @@
       reader: 'PTT 閱讀器', board: '看板', articles: '文章列表', latest: '最新文章', previous: '上一頁', next: '下一頁', oldest: '最早',
       search: '搜尋文章', searchResults: '搜尋結果', pageOverview: '本頁概覽', stories: '文章', active: '高討論', categories: '主題分布', authors: '活躍作者',
       allDiscussions: '按時間排列的最新討論', by: '作者', replies: '討論', readingTime: '閱讀時間', minute: '分鐘', characters: '字', articleInfo: '文章資訊',
-      backBoard: '返回看板', original: '原始頁面', settings: '閱讀設定', language: '文字語言', traditional: '繁體', simplified: '簡體', appearance: '閱讀背景',
+      backBoard: '返回看板', original: '原始頁面', settings: '閱讀設定', releasedAt: '發佈於', language: '文字語言', traditional: '繁體', simplified: '簡體', appearance: '閱讀背景',
       paper: '白紙', ink: '墨夜', mist: '霧藍', rose: '柔灰', fontSize: '正文字號', smaller: '減小字號', larger: '增大字號',
       up: '推', neutral: '箭頭', down: '噓', progress: '閱讀進度', loading: '正在讀取 PTT', retry: '重新載入', loadError: '頁面讀取失敗',
       noStories: '本頁沒有可顯示的文章', deleted: '文章已刪除', hot: '熱門', pinned: '置頂', page: '頁', openMenu: '開啟導覽', close: '關閉', discussion: '討論區',
@@ -201,7 +204,9 @@
     .pttr-progress-track { height:4px; overflow:hidden; background:var(--r-subtle); } .pttr-progress-track span { display:block; width:0; height:100%; background:var(--r-accent); transition:width .12s linear; }
     .pttr-info-list { display:grid; gap:13px; } .pttr-info-row { display:flex; justify-content:space-between; gap:10px; color:var(--r-faint); font-size:11px; } .pttr-info-row strong { color:var(--r-muted); font-weight:650; text-align:right; overflow-wrap:anywhere; }
     .pttr-settings { width:300px; position:fixed; z-index:60; isolation:isolate; top:58px; right:18px; padding:18px; opacity:1!important; color:var(--r-text,#18201d); border:1px solid var(--r-border,#dbe1de); border-radius:8px; background:var(--r-surface,#ffffff)!important; box-shadow:var(--r-shadow,0 12px 34px rgba(0,0,0,.14)); backdrop-filter:none!important; }
-    .pttr-settings[hidden] { display:none; } .pttr-settings-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; } .pttr-settings-head h2 { margin:0; font-size:14px; }
+    .pttr-settings[hidden] { display:none; } .pttr-settings-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:18px; } .pttr-settings-head h2 { margin:0; font-size:14px; }
+    .pttr-settings-release { display:flex; align-items:center; flex-wrap:wrap; gap:3px 7px; margin:4px 0 0; color:var(--r-faint); font-size:10px; line-height:1.4; }
+    .pttr-settings-release strong { color:var(--r-muted); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10px; font-weight:700; }
     .pttr-settings-close { width:30px; height:30px; padding:0; border:0; border-radius:6px; color:var(--r-muted); background:transparent; cursor:pointer; font-size:18px; } .pttr-settings-close:hover { color:var(--r-text); background:var(--r-subtle); }
     .pttr-setting-group { padding:15px 0; border-top:1px solid var(--r-border); } .pttr-setting-group:first-of-type { border-top:0; padding-top:0; } .pttr-setting-label { display:block; margin-bottom:9px; color:var(--r-muted); font-size:11px; font-weight:650; }
     .pttr-segment { display:grid; grid-template-columns:1fr 1fr; padding:3px; border-radius:7px; background:var(--r-subtle); } .pttr-segment button { min-height:32px; border:0; border-radius:5px; color:var(--r-muted); background:transparent; cursor:pointer; font-size:12px; } .pttr-segment button.active { color:var(--r-text); background:var(--r-surface); box-shadow:0 1px 4px rgba(0,0,0,.08); font-weight:700; }
@@ -320,7 +325,7 @@
       </div>
       <button class="pttr-sidebar-scrim" id="pttr-sidebar-scrim" type="button" aria-label="Close"></button>
       <aside class="pttr-settings" id="pttr-settings" hidden>
-        <div class="pttr-settings-head"><h2 id="pttr-settings-title"></h2><button class="pttr-settings-close" id="pttr-settings-close" type="button" aria-label="Close">×</button></div>
+        <div class="pttr-settings-head"><div><h2 id="pttr-settings-title"></h2><p class="pttr-settings-release"><strong id="pttr-settings-version"></strong><span id="pttr-settings-released-at"></span></p></div><button class="pttr-settings-close" id="pttr-settings-close" type="button" aria-label="Close">×</button></div>
         <div class="pttr-setting-group"><span class="pttr-setting-label" id="pttr-language-label"></span><div class="pttr-segment"><button type="button" data-lang="zh-TW"></button><button type="button" data-lang="zh-CN"></button></div></div>
         <div class="pttr-setting-group"><span class="pttr-setting-label" id="pttr-theme-label"></span><div class="pttr-theme-grid">
           <button class="pttr-theme-option" type="button" data-theme="paper"><span class="pttr-theme-swatch" style="--swatch:#f3f5f4"></span><span></span></button>
@@ -902,6 +907,8 @@
   function updateSettings() {
     if (!settings) return;
     app.querySelector('#pttr-settings-title').textContent = text('settings');
+    app.querySelector('#pttr-settings-version').textContent = `v${SCRIPT_VERSION}`;
+    app.querySelector('#pttr-settings-released-at').textContent = `${text('releasedAt')} ${SCRIPT_RELEASED_AT}`;
     app.querySelector('#pttr-language-label').textContent = text('language');
     app.querySelector('#pttr-theme-label').textContent = text('appearance');
     app.querySelector('#pttr-font-label').textContent = text('fontSize');
