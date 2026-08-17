@@ -2,7 +2,7 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.5.0
+// @version      2.5.1
 // @description  將 PTT 轉換為最新優先的瀑布流 SPA 閱讀器，支援向下無限載入、頁面狀態還原與閱讀設定
 // @description:en Transform PTT into a modern latest-first waterfall reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
@@ -19,8 +19,8 @@
 (function () {
   'use strict';
 
-  const SCRIPT_VERSION = '2.5.0';
-  const SCRIPT_RELEASED_AT = '2026-08-17 13:17:41 UTC+8';
+  const SCRIPT_VERSION = '2.5.1';
+  const SCRIPT_RELEASED_AT = '2026-08-17 13:38:19 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -134,8 +134,9 @@
     .pttr-search input:focus { border-color:var(--r-accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--r-accent) 16%,transparent); }
     .pttr-list-toolbar { min-height:46px; display:flex; align-items:center; color:var(--r-muted); border-top:1px solid var(--r-border); border-bottom:1px solid var(--r-border); }
     .pttr-count { font-size:12px; } .pttr-count strong { color:var(--r-text); }
-    .pttr-story-list { columns:250px auto; column-gap:16px; padding-top:18px; }
-    .pttr-story { width:100%; display:inline-block; break-inside:avoid; margin:0 0 16px; overflow:hidden; color:inherit; text-decoration:none; vertical-align:top; border:1px solid var(--r-border); border-radius:8px; background:var(--r-surface); box-shadow:0 2px 8px rgba(28,38,33,.04); transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
+    .pttr-story-list { display:grid; grid-template-columns:repeat(var(--pttr-column-count,4),minmax(0,1fr)); align-items:start; gap:16px; padding-top:18px; }
+    .pttr-story-column { min-width:0; display:flex; flex-direction:column; gap:16px; }
+    .pttr-story { width:100%; display:block; overflow:hidden; color:inherit; text-decoration:none; border:1px solid var(--r-border); border-radius:8px; background:var(--r-surface); box-shadow:0 2px 8px rgba(28,38,33,.04); transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
     .pttr-story:hover { transform:translateY(-3px); border-color:color-mix(in srgb,var(--r-accent) 42%,var(--r-border)); box-shadow:var(--r-shadow); }
     .pttr-story.disabled { opacity:.58; cursor:default; }
     .pttr-story-cover { min-height:var(--card-height); display:flex; flex-direction:column; justify-content:space-between; gap:18px; padding:16px; color:var(--r-cover-text); background:var(--card-bg); }
@@ -203,7 +204,7 @@
     .pttr-toast { position:fixed; left:50%; bottom:22px; z-index:80; transform:translate(-50%,16px); opacity:0; pointer-events:none; padding:9px 14px; border-radius:6px; color:var(--r-surface); background:var(--r-text); box-shadow:var(--r-shadow); font-size:12px; transition:opacity .2s ease,transform .2s ease; } .pttr-toast.show { opacity:1; transform:translate(-50%,0); }
     @media (max-width:1180px) { .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:minmax(0,1fr); } .pttr-rail { display:none; } .pttr-view { max-width:960px; } }
     @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { padding:0 12px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px 56px; } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px 70px; } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
-    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px 50px; } .pttr-story-list { columns:2; column-gap:10px; padding-top:12px; } .pttr-story { margin-bottom:10px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
+    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px 50px; } .pttr-story-list, .pttr-story-column { gap:10px; } .pttr-story-list { padding-top:12px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
     @media (prefers-reduced-motion:reduce) { #ptt-reader-app *, #ptt-reader-app *::before, #ptt-reader-app *::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
   `;
 
@@ -213,6 +214,7 @@
   let mainScroller;
   let settings;
   let toastTimer;
+  let resizeTimer;
 
   bootstrap();
 
@@ -366,6 +368,10 @@
       updateReadingProgress();
       maybeLoadMore();
     }, { passive: true });
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(reflowStoryColumns, 120);
+    });
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     window.addEventListener('popstate', handleHistoryNavigation);
     document.addEventListener('keydown', (event) => {
@@ -501,13 +507,14 @@
     view.innerHTML = `
       <section>
         <header class="pttr-view-head">
-          <div><p class="pttr-eyebrow">${escapeHtml(model.board)}${model.pageNumber ? ` · ${escapeHtml(text('page'))} ${escapeHtml(model.pageNumber)}` : ''}</p><h1>${escapeHtml(heading)}</h1><p class="pttr-view-subtitle">${escapeHtml(model.query ? `“${model.query}”` : text('allDiscussions'))}</p></div>
+          <div><p class="pttr-eyebrow">${escapeHtml(model.board)}</p><h1>${escapeHtml(heading)}</h1><p class="pttr-view-subtitle">${escapeHtml(model.query ? `“${model.query}”` : text('allDiscussions'))}</p></div>
           <form class="pttr-search" id="pttr-search-form"><input name="q" type="search" value="${escapeAttr(model.query || '')}" placeholder="${escapeAttr(text('search'))}" aria-label="${escapeAttr(text('search'))}"></form>
         </header>
         <div class="pttr-list-toolbar"><div class="pttr-count"><strong>${model.stories.length}</strong> ${escapeHtml(text('stories'))}</div></div>
-        ${model.stories.length ? `<div class="pttr-story-list">${model.stories.map(storyHtml).join('')}</div>` : `<div class="pttr-empty">${escapeHtml(text('noStories'))}</div>`}
+        ${model.stories.length ? '<div class="pttr-story-list" role="list"></div>' : `<div class="pttr-empty">${escapeHtml(text('noStories'))}</div>`}
         <div class="pttr-infinite-status${state.infiniteLoading ? ' loading' : ''}${state.infiniteError ? ' error' : ''}" id="pttr-infinite-status" role="status">${escapeHtml(infiniteStatusText())}</div>
       </section>`;
+    if (model.stories.length) renderStoryColumns(model.stories);
   }
 
   function storyHtml(story) {
@@ -518,10 +525,74 @@
     const element = story.href ? 'a' : 'div';
     const attributes = story.href ? `href="${escapeAttr(story.href)}" data-pttr-nav` : '';
     const visual = storyVisual(story);
-    return `<${element} class="pttr-story${story.href ? '' : ' disabled'}" style="--card-height:${visual.height}px;--card-mobile-height:${visual.mobileHeight}px;--card-bg:var(--r-cover-${visual.tone})" ${attributes}>
+    return `<${element} class="pttr-story${story.href ? '' : ' disabled'}" role="listitem" style="--card-height:${visual.height}px;--card-mobile-height:${visual.mobileHeight}px;--card-bg:var(--r-cover-${visual.tone})" ${attributes}>
       <div class="pttr-story-cover"><div class="pttr-story-badges">${tag}${pinned}</div><div class="pttr-story-heading"><h2>${escapeHtml(translate(story.headline || text('deleted')))}</h2></div></div>
       <div class="pttr-story-footer"><div class="pttr-story-author"><span class="pttr-card-avatar">${escapeHtml(initial(story.author))}</span><strong>${escapeHtml(story.author)}</strong></div><div class="pttr-story-engagement"><span>${escapeHtml(story.date)}</span><strong class="pttr-story-score${scoreClass}">♥ ${escapeHtml(score)}</strong></div></div>
     </${element}>`;
+  }
+
+  function storyColumnCount(list) {
+    if (matchMedia('(max-width:560px)').matches) return 2;
+    const width = list.clientWidth || mainScroller.clientWidth;
+    return Math.max(1, Math.floor((width + 16) / 266));
+  }
+
+  function estimatedStoryHeight(story) {
+    const visual = storyVisual(story);
+    return matchMedia('(max-width:560px)').matches
+      ? visual.mobileHeight + 56
+      : visual.height + 68;
+  }
+
+  function storyBuckets(stories, count) {
+    const buckets = Array.from({ length: count }, () => []);
+    const heights = Array(count).fill(0);
+    stories.forEach((story) => {
+      const target = heights.indexOf(Math.min(...heights));
+      buckets[target].push(story);
+      heights[target] += estimatedStoryHeight(story);
+    });
+    return { buckets, heights };
+  }
+
+  function renderStoryColumns(stories) {
+    const list = view.querySelector('.pttr-story-list');
+    if (!list) return;
+    const count = storyColumnCount(list);
+    const { buckets, heights } = storyBuckets(stories, count);
+    list.style.setProperty('--pttr-column-count', String(count));
+    list.dataset.pttrColumns = String(count);
+    list.innerHTML = buckets.map((bucket, index) => `<div class="pttr-story-column" role="presentation" data-pttr-height="${heights[index]}">${bucket.map(storyHtml).join('')}</div>`).join('');
+  }
+
+  function appendStoryColumns(stories) {
+    if (!stories.length) return;
+    let list = view.querySelector('.pttr-story-list');
+    if (!list) {
+      const empty = view.querySelector('.pttr-empty');
+      if (!empty) return;
+      list = document.createElement('div');
+      list.className = 'pttr-story-list';
+      list.setAttribute('role', 'list');
+      empty.replaceWith(list);
+      renderStoryColumns(state.model.stories);
+      return;
+    }
+    const columns = Array.from(list.querySelectorAll('.pttr-story-column'));
+    stories.forEach((story) => {
+      const target = columns.reduce((shortest, column) => Number(column.dataset.pttrHeight) < Number(shortest.dataset.pttrHeight) ? column : shortest);
+      target.insertAdjacentHTML('beforeend', storyHtml(story));
+      target.dataset.pttrHeight = String(Number(target.dataset.pttrHeight) + estimatedStoryHeight(story));
+    });
+  }
+
+  function reflowStoryColumns() {
+    if (!state.model || state.model.type !== 'board') return;
+    const list = view.querySelector('.pttr-story-list');
+    if (!list || storyColumnCount(list) === Number(list.dataset.pttrColumns)) return;
+    const scrollTop = mainScroller.scrollTop;
+    renderStoryColumns(state.model.stories);
+    restoreScrollPosition(scrollTop, state.url);
   }
 
   function storyVisual(story) {
@@ -654,7 +725,8 @@
     if (!state.model || state.model.type !== 'board' || state.infiniteLoading || state.infiniteComplete || !state.model.pagination?.previous) return;
     if (!mainScroller.scrollHeight || !mainScroller.clientHeight) return;
     const distanceToBottom = mainScroller.scrollHeight - mainScroller.scrollTop - mainScroller.clientHeight;
-    if (distanceToBottom <= 700) loadNextBoardPage();
+    const prefetchDistance = Math.max(900, Math.round(mainScroller.clientHeight * 1.2));
+    if (distanceToBottom <= prefetchDistance) loadNextBoardPage();
   }
 
   async function loadNextBoardPage() {
@@ -674,7 +746,6 @@
 
     const modelAtStart = state.model;
     const urlAtStart = state.url;
-    const scrollTop = mainScroller.scrollTop;
     const controller = new AbortController();
     state.infiniteController?.abort();
     state.infiniteController = controller;
@@ -714,8 +785,9 @@
         stories: [...modelAtStart.stories, ...additions],
         pagination: nextModel.pagination
       };
-      renderCurrent(false);
-      restoreScrollPosition(scrollTop, urlAtStart);
+      appendStoryColumns(additions);
+      const count = view.querySelector('.pttr-count strong');
+      if (count) count.textContent = String(state.model.stories.length);
     } catch (error) {
       if (error.name === 'AbortError') return;
       console.warn('[PTT Reader] infinite load failed', error);
@@ -725,6 +797,7 @@
         state.infiniteController = null;
         state.infiniteLoading = false;
         updateInfiniteStatus();
+        if (!state.infiniteError) requestAnimationFrame(maybeLoadMore);
       }
     }
   }
