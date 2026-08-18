@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.8.0
+// @version      0.9.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.8.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 17:50:24 UTC+8';
+    const SCRIPT_VERSION = '0.9.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 18:25:09 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v3';
@@ -359,10 +359,11 @@
             right: 18px;
             display: flex;
             align-items: center;
-            width: min(310px, calc(100vw - 24px));
-            min-height: 48px;
-            gap: 7px;
-            padding: 6px 7px;
+            width: auto;
+            max-width: calc(100vw - 24px);
+            min-height: 44px;
+            gap: 5px;
+            padding: 5px 6px;
             border: 1px solid rgba(38, 52, 66, 0.17);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.97);
@@ -371,43 +372,20 @@
             overflow: hidden;
         }
 
-        .rer-toolbar-summary {
-            display: flex;
-            align-items: center;
-            flex: 1;
-            min-width: 0;
-            gap: 8px;
-        }
-
-        .rer-toolbar-mark {
-            display: inline-grid;
-            place-items: center;
-            width: 28px;
-            height: 28px;
-            flex: 0 0 auto;
-            border-radius: 6px;
-            background: var(--rer-accent);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 800;
-        }
-
         .rer-status {
-            flex: 1;
-            min-width: 0;
+            min-width: 38px;
+            padding: 0 5px;
             color: var(--rer-muted);
-            font-size: 11px;
-            font-weight: 650;
+            font-size: 12px;
+            font-weight: 700;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .rer-toolbar-actions {
             display: flex;
             flex: 0 0 auto;
-            gap: 6px;
+            gap: 4px;
         }
 
         .rer-button {
@@ -462,8 +440,26 @@
         }
 
         .rer-toolbar .rer-button {
-            min-height: 34px;
-            padding: 0 10px;
+            min-height: 32px;
+            padding: 0 9px;
+        }
+
+        .rer-toolbar .rer-icon-button {
+            display: inline-grid;
+            place-items: center;
+            width: 32px;
+            padding: 0;
+        }
+
+        .rer-toolbar-icon {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
         }
 
         .rer-settings-backdrop {
@@ -477,7 +473,7 @@
             position: fixed;
             top: 72px;
             right: 16px;
-            width: min(440px, calc(100vw - 32px));
+            width: min(390px, calc(100vw - 32px));
             max-height: calc(100vh - 92px);
             overflow: auto;
             padding: 0;
@@ -491,14 +487,14 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 14px 16px;
+            padding: 11px 14px;
             border-bottom: 1px solid rgba(38, 52, 66, 0.11);
         }
 
         .rer-settings-header h2 {
             flex: 1;
             margin: 0;
-            font-size: 17px;
+            font-size: 15px;
             line-height: 1.25;
         }
 
@@ -522,15 +518,15 @@
         }
 
         .rer-settings-body {
-            padding: 14px 16px 4px;
+            padding: 10px 14px 2px;
         }
 
         .rer-settings-section {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .rer-settings-section-title {
-            margin: 0 0 8px;
+            margin: 0 0 5px;
             color: var(--rer-muted);
             font-size: 11px;
             font-weight: 750;
@@ -539,7 +535,7 @@
         .rer-field {
             display: grid;
             gap: 5px;
-            margin: 10px 0;
+            margin: 8px 0;
         }
 
         .rer-field label {
@@ -577,7 +573,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            min-height: 44px;
+            min-height: 40px;
             border-bottom: 1px solid rgba(38, 52, 66, 0.09);
         }
 
@@ -594,6 +590,23 @@
             color: var(--rer-ink);
             font-size: 13px;
             font-weight: 650;
+        }
+
+        .rer-setting-number {
+            box-sizing: border-box;
+            width: 68px;
+            min-height: 34px;
+            padding: 5px 8px;
+            border: 1px solid rgba(38, 52, 66, 0.2);
+            border-radius: 6px;
+            color: var(--rer-ink);
+            font: 13px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            text-align: center;
+        }
+
+        .rer-setting-number:focus {
+            border-color: rgba(8, 121, 111, 0.7);
+            outline: 2px solid rgba(8, 121, 111, 0.14);
         }
 
         .rer-switch {
@@ -650,7 +663,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-top: 1px solid rgba(38, 52, 66, 0.11);
             background: #fafbfb;
         }
@@ -660,16 +673,11 @@
             font-size: 10px;
         }
 
-        .rer-settings-actions {
-            display: flex;
-            gap: 8px;
-        }
-
         @media (max-width: 560px) {
             .rer-toolbar {
                 top: 62px;
                 right: 12px;
-                width: min(300px, calc(100vw - 24px));
+                width: auto;
             }
 
             .rer-settings {
@@ -693,9 +701,6 @@
                 grid-template-columns: 64px minmax(0, 1fr);
             }
 
-            .rer-settings-footer {
-                flex-wrap: wrap;
-            }
         }
     `;
 
@@ -738,6 +743,7 @@
     function normalizeConfig(value) {
         const normalized = { ...DEFAULT_CONFIG, ...(value || {}) };
         normalized.sentencesPerLoad = Math.min(10, Math.max(1, Math.round(Number(normalized.sentencesPerLoad) || 5)));
+        normalized.defaultExpanded = false;
         delete normalized.toolbarCollapsed;
         return normalized;
     }
@@ -783,14 +789,28 @@
         toolbarRoot.className = 'rer-toolbar';
         toolbarRoot.setAttribute('aria-label', 'Reuters English Reader');
         toolbarRoot.innerHTML = `
-            <div class="rer-toolbar-summary">
-                <span class="rer-toolbar-mark" aria-hidden="true">R</span>
-                <span class="rer-status" data-rer-status aria-live="polite">已加载 0 句</span>
-            </div>
+            <span class="rer-status" data-rer-status aria-live="polite">0 句</span>
             <div class="rer-toolbar-actions">
-                <button type="button" class="rer-button rer-button-primary" data-rer-action="continue">继续</button>
+                <button type="button" class="rer-button rer-button-primary rer-icon-button" data-rer-action="continue" aria-label="继续加载" title="继续加载">
+                    <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="m7 6 5 5 5-5"></path>
+                        <path d="m7 13 5 5 5-5"></path>
+                    </svg>
+                </button>
                 <button type="button" class="rer-button" data-rer-action="load-all" aria-label="加载全文" title="加载全文">全文</button>
-                <button type="button" class="rer-button" data-rer-action="settings">设置</button>
+                <button type="button" class="rer-button rer-icon-button" data-rer-action="settings" aria-label="设置" title="设置">
+                    <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M21 4h-7"></path>
+                        <path d="M10 4H3"></path>
+                        <path d="M21 12h-9"></path>
+                        <path d="M8 12H3"></path>
+                        <path d="M21 20h-5"></path>
+                        <path d="M12 20H3"></path>
+                        <path d="M14 2v4"></path>
+                        <path d="M8 10v4"></path>
+                        <path d="M16 18v4"></path>
+                    </svg>
+                </button>
             </div>
         `;
         statusNode = toolbarRoot.querySelector('[data-rer-status]');
@@ -814,7 +834,7 @@
 
     function updateLoadedCount() {
         const ready = getConnectedReadingItems().filter((item) => item.ready).length;
-        if (statusNode) statusNode.textContent = `已加载 ${ready} 句`;
+        if (statusNode) statusNode.textContent = `${ready} 句`;
     }
 
     function registerMenu() {
@@ -835,7 +855,7 @@
         panel.setAttribute('aria-label', 'Reuters English Reader settings');
         panel.innerHTML = `
             <div class="rer-settings-header">
-                <h2>Reuters 精读设置</h2>
+                <h2>精读设置</h2>
                 <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
             </div>
             <div class="rer-settings-body">
@@ -853,36 +873,29 @@
                         <label for="rer-model">模型</label>
                         <input id="rer-model" type="text" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(DEFAULT_MODEL)}">
                     </div>
-                    <div class="rer-help">API key 只保存在本地 userscript 存储中。</div>
                 </div>
                 <div class="rer-settings-section">
-                    <div class="rer-settings-section-title">阅读行为</div>
-                    ${renderSettingSwitch('rer-enabled', '启用精读', '刷新页面后完整生效')}
-                    ${renderSettingSwitch('rer-auto', '自动加载', '首次打开文章时只准备第一批')}
-                    ${renderSettingSwitch('rer-expanded', '默认展开', '加载完成后直接显示句子精读')}
-                    <div class="rer-field">
-                        <label for="rer-sentences-per-load">每批句数</label>
-                        <input id="rer-sentences-per-load" type="number" min="1" max="10" step="1" inputmode="numeric">
-                        <div class="rer-help">首次自动加载和每次“继续”使用相同数量，范围 1-10 句。</div>
+                    <div class="rer-settings-section-title">阅读</div>
+                    ${renderSettingSwitch('rer-enabled', '启用')}
+                    ${renderSettingSwitch('rer-auto', '自动加载')}
+                    <div class="rer-setting-row">
+                        <label class="rer-setting-name" for="rer-sentences-per-load">每批句数</label>
+                        <input class="rer-setting-number" id="rer-sentences-per-load" type="number" min="1" max="10" step="1" inputmode="numeric">
                     </div>
                 </div>
                 <div class="rer-settings-section">
-                    <div class="rer-settings-section-title">数据管理</div>
+                    <div class="rer-settings-section-title">数据</div>
                     <div class="rer-setting-row">
                         <div class="rer-setting-copy">
-                            <div class="rer-setting-name">清除精读缓存</div>
-                            <div class="rer-help">删除已保存的译文、词组和句子主干；不会删除 API 设置。</div>
+                            <div class="rer-setting-name">精读缓存</div>
                         </div>
                         <button type="button" class="rer-button rer-button-danger" data-rer-settings="clear-cache">清除</button>
                     </div>
                 </div>
             </div>
             <div class="rer-settings-footer">
-                <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)} · ${escapeHtml(SCRIPT_RELEASED_AT)}</div>
-                <div class="rer-settings-actions">
-                    <button type="button" class="rer-button" data-rer-settings="cancel">取消</button>
-                    <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">保存</button>
-                </div>
+                <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)}</div>
+                <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">保存</button>
             </div>
         `;
         settingsRoot = document.createElement('div');
@@ -899,7 +912,6 @@
         sentencesPerLoadInput.value = String(config.sentencesPerLoad);
         panel.querySelector('#rer-enabled').checked = Boolean(config.enabled);
         panel.querySelector('#rer-auto').checked = Boolean(config.autoAnalyze);
-        panel.querySelector('#rer-expanded').checked = Boolean(config.defaultExpanded);
 
         backdrop.addEventListener('click', closeSettings);
         panel.addEventListener('click', (event) => {
@@ -923,7 +935,7 @@
                 model: modelInput.value.trim() || DEFAULT_MODEL,
                 enabled: panel.querySelector('#rer-enabled').checked,
                 autoAnalyze: panel.querySelector('#rer-auto').checked,
-                defaultExpanded: panel.querySelector('#rer-expanded').checked,
+                defaultExpanded: false,
                 sentencesPerLoad: sentencesPerLoadInput.value,
                 targetLanguage: DEFAULT_CONFIG.targetLanguage
             };
@@ -936,12 +948,11 @@
         endpointInput.focus();
     }
 
-    function renderSettingSwitch(id, name, help) {
+    function renderSettingSwitch(id, name) {
         return `
             <div class="rer-setting-row">
                 <div class="rer-setting-copy">
                     <div class="rer-setting-name">${escapeHtml(name)}</div>
-                    <div class="rer-help">${escapeHtml(help)}</div>
                 </div>
                 <label class="rer-switch">
                     <input id="${escapeHtml(id)}" type="checkbox">
