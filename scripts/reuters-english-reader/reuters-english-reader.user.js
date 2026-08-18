@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.2.1
+// @version      0.3.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,13 +26,12 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.2.1';
-    const SCRIPT_RELEASED_AT = '2026-08-18 14:09:02 UTC+8';
+    const SCRIPT_VERSION = '0.3.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 14:40:21 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
     const SENTENCE_PREFIX = 'rer-s';
-    const MAX_ANALYSIS_SENTENCES = 80;
     const ANALYSIS_BATCH_SIZE = 3;
     const ANALYSIS_CONCURRENCY = 2;
     const CACHE_LIMIT = 400;
@@ -48,7 +47,7 @@
         enabled: true,
         autoAnalyze: true,
         defaultExpanded: false,
-        toolbarCollapsed: true,
+        sentencesPerLoad: 5,
         targetLanguage: 'Simplified Chinese'
     };
     const ROLE_CLASS = {
@@ -67,15 +66,13 @@
     let config = loadConfig();
     let analysisCache = loadAnalysisCache();
     let sentenceCounter = 0;
-    let articleRoot = null;
     let toolbarRoot = null;
     let settingsRoot = null;
     let statusNode = null;
-    let progressNode = null;
-    let progressBarNode = null;
     let analyzeRunning = false;
     let autoAnalyzeTimer = 0;
-    let allDetailsExpanded = false;
+    let autoAnalyzeQueuedKey = '';
+    let autoAnalyzedArticleKey = '';
     const sentences = new Map();
 
     const css = String.raw`
@@ -91,9 +88,21 @@
             --rer-shadow: 0 16px 42px rgba(25, 38, 51, 0.2);
         }
 
-        html.rer-reading-active article p[data-rer-paragraph="true"],
-        html.rer-reading-active main p[data-rer-paragraph="true"] {
+        html.rer-reading-active [data-rer-reading-element="true"] {
             line-height: 1.72 !important;
+        }
+
+        .rer-reading-title .rer-sentence-block {
+            margin: 0.24em 0 0.42em;
+        }
+
+        .rer-reading-title .rer-sentence {
+            padding: 0.28em 0.4em 0.32em;
+            line-height: 1.28;
+        }
+
+        .rer-reading-title .rer-detail-panel {
+            font-weight: 400;
         }
 
         .rer-sentence-block {
@@ -346,7 +355,12 @@
             position: fixed;
             top: 72px;
             right: 18px;
-            width: min(336px, calc(100vw - 24px));
+            display: flex;
+            align-items: center;
+            width: min(310px, calc(100vw - 24px));
+            min-height: 48px;
+            gap: 7px;
+            padding: 6px 7px;
             border: 1px solid rgba(38, 52, 66, 0.17);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.97);
@@ -355,31 +369,12 @@
             overflow: hidden;
         }
 
-        .rer-toolbar.rer-toolbar-collapsed {
-            width: auto;
-            max-width: calc(100vw - 24px);
-        }
-
-        .rer-toolbar-toggle {
+        .rer-toolbar-summary {
             display: flex;
             align-items: center;
-            width: 100%;
-            min-height: 44px;
-            gap: 9px;
-            padding: 7px 10px;
-            border: 0;
-            background: transparent;
-            color: var(--rer-ink);
-            cursor: pointer;
-            font: inherit;
-            text-align: left;
-            touch-action: manipulation;
-        }
-
-        .rer-toolbar-toggle:hover,
-        .rer-toolbar-toggle:focus-visible {
-            background: rgba(8, 121, 111, 0.06);
-            outline: none;
+            flex: 1;
+            min-width: 0;
+            gap: 8px;
         }
 
         .rer-toolbar-mark {
@@ -395,80 +390,22 @@
             font-weight: 800;
         }
 
-        .rer-toolbar-title {
+        .rer-status {
             flex: 1;
             min-width: 0;
-            font-size: 13px;
-            font-weight: 750;
-            white-space: nowrap;
-        }
-
-        .rer-version {
-            color: var(--rer-muted);
-            font-size: 10px;
-            font-weight: 500;
-        }
-
-        .rer-progress-count {
-            flex: 0 0 auto;
             color: var(--rer-muted);
             font-size: 11px;
+            font-weight: 650;
             font-variant-numeric: tabular-nums;
-        }
-
-        .rer-toolbar-chevron {
-            width: 8px;
-            height: 8px;
-            flex: 0 0 auto;
-            margin: 0 3px 4px 1px;
-            border-right: 1.5px solid var(--rer-muted);
-            border-bottom: 1.5px solid var(--rer-muted);
-            transform: rotate(45deg);
-            transition: transform 150ms ease;
-        }
-
-        .rer-toolbar:not(.rer-toolbar-collapsed) .rer-toolbar-chevron {
-            margin-bottom: 0;
-            transform: rotate(225deg);
-        }
-
-        .rer-toolbar-body {
-            padding: 0 11px 11px;
-            border-top: 1px solid rgba(38, 52, 66, 0.1);
-        }
-
-        .rer-toolbar-body[hidden] {
-            display: none !important;
-        }
-
-        .rer-status {
-            min-height: 34px;
-            padding: 9px 1px 7px;
-            color: var(--rer-muted);
-            font-size: 11px;
-            line-height: 1.45;
-        }
-
-        .rer-progress-track {
-            height: 3px;
-            margin-bottom: 10px;
+            white-space: nowrap;
             overflow: hidden;
-            border-radius: 3px;
-            background: rgba(38, 52, 66, 0.1);
-        }
-
-        .rer-progress-bar {
-            display: block;
-            width: 0;
-            height: 100%;
-            background: var(--rer-accent);
-            transition: width 180ms ease;
+            text-overflow: ellipsis;
         }
 
         .rer-toolbar-actions {
-            display: grid;
-            grid-template-columns: 1.3fr 1fr 1fr;
-            gap: 7px;
+            display: flex;
+            flex: 0 0 auto;
+            gap: 6px;
         }
 
         .rer-button {
@@ -510,55 +447,9 @@
             background: var(--rer-accent-strong);
         }
 
-        .rer-toolbar-secondary {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 9px;
-        }
-
-        .rer-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px 8px;
-            color: var(--rer-muted);
-            font-size: 10px;
-        }
-
-        .rer-legend span {
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-        }
-
-        .rer-legend span::before {
-            content: "";
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
-            background: #8a96a3;
-        }
-
-        .rer-legend span:nth-child(1)::before { background: #1677ff; }
-        .rer-legend span:nth-child(2)::before { background: #cd374b; }
-        .rer-legend span:nth-child(3)::before { background: #15803d; }
-        .rer-legend span:nth-child(4)::before { background: #744cb8; }
-
-        .rer-link-button {
-            appearance: none;
-            min-height: 30px;
-            padding: 0 4px;
-            border: 0;
-            background: transparent;
-            color: var(--rer-muted);
-            cursor: pointer;
-            font: 600 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
-        }
-
-        .rer-link-button:hover,
-        .rer-link-button:focus-visible {
-            color: var(--rer-accent-strong);
-            outline: none;
+        .rer-toolbar .rer-button {
+            min-height: 34px;
+            padding: 0 10px;
         }
 
         .rer-settings-backdrop {
@@ -644,7 +535,8 @@
         }
 
         .rer-field input[type="text"],
-        .rer-field input[type="password"] {
+        .rer-field input[type="password"],
+        .rer-field input[type="number"] {
             box-sizing: border-box;
             width: 100%;
             min-height: 38px;
@@ -763,11 +655,7 @@
             .rer-toolbar {
                 top: 62px;
                 right: 12px;
-                width: calc(100vw - 24px);
-            }
-
-            .rer-toolbar.rer-toolbar-collapsed {
-                width: auto;
+                width: min(300px, calc(100vw - 24px));
             }
 
             .rer-settings {
@@ -806,13 +694,13 @@
         installInteractionHandlers();
         enhanceArticle();
         observePageChanges();
-        updateStatusFromState();
+        updateLoadedCount();
     }
 
     function loadConfig() {
         const stored = safeGetValue(CONFIG_KEY, null);
         if (stored && typeof stored === 'object') {
-            return { ...DEFAULT_CONFIG, ...stored };
+            return normalizeConfig(stored);
         }
         const legacy = safeGetValue(LEGACY_CONFIG_KEY, null);
         const migrated = legacy && typeof legacy === 'object'
@@ -825,12 +713,19 @@
             }
             : { ...DEFAULT_CONFIG };
         safeSetValue(CONFIG_KEY, migrated);
-        return migrated;
+        return normalizeConfig(migrated);
     }
 
     function saveConfig(nextConfig) {
-        config = { ...DEFAULT_CONFIG, ...nextConfig };
+        config = normalizeConfig(nextConfig);
         safeSetValue(CONFIG_KEY, config);
+    }
+
+    function normalizeConfig(value) {
+        const normalized = { ...DEFAULT_CONFIG, ...(value || {}) };
+        normalized.sentencesPerLoad = Math.min(10, Math.max(1, Math.round(Number(normalized.sentencesPerLoad) || 5)));
+        delete normalized.toolbarCollapsed;
+        return normalized;
     }
 
     function loadAnalysisCache() {
@@ -871,99 +766,44 @@
     function buildToolbar() {
         if (toolbarRoot) return;
         toolbarRoot = document.createElement('section');
-        toolbarRoot.className = `rer-toolbar${config.toolbarCollapsed ? ' rer-toolbar-collapsed' : ''}`;
+        toolbarRoot.className = 'rer-toolbar';
         toolbarRoot.setAttribute('aria-label', 'Reuters English Reader');
         toolbarRoot.innerHTML = `
-            <button type="button" class="rer-toolbar-toggle" data-rer-action="toggle" aria-expanded="${String(!config.toolbarCollapsed)}">
+            <div class="rer-toolbar-summary">
                 <span class="rer-toolbar-mark" aria-hidden="true">R</span>
-                <span class="rer-toolbar-title">Reuters 精读 <span class="rer-version">v${escapeHtml(SCRIPT_VERSION)}</span></span>
-                <span class="rer-progress-count" data-rer-progress>0/0</span>
-                <span class="rer-toolbar-chevron" aria-hidden="true"></span>
-            </button>
-            <div class="rer-toolbar-body" data-rer-toolbar-body${config.toolbarCollapsed ? ' hidden' : ''}>
-                <div class="rer-status" data-rer-status>准备正文</div>
-                <div class="rer-progress-track"><span class="rer-progress-bar" data-rer-progress-bar></span></div>
-                <div class="rer-toolbar-actions">
-                    <button type="button" class="rer-button rer-button-primary" data-rer-action="analyze">加载缺失</button>
-                    <button type="button" class="rer-button" data-rer-action="expand">全部展开</button>
-                    <button type="button" class="rer-button" data-rer-action="settings">设置</button>
-                </div>
-                <div class="rer-toolbar-secondary">
-                    <div class="rer-legend" aria-label="Structure legend">
-                        <span>主语</span><span>谓语</span><span>宾语</span><span>补语</span>
-                    </div>
-                    <button type="button" class="rer-link-button" data-rer-action="collapse">收起</button>
-                </div>
+                <span class="rer-status" data-rer-status aria-live="polite">已加载 0 句</span>
+            </div>
+            <div class="rer-toolbar-actions">
+                <button type="button" class="rer-button rer-button-primary" data-rer-action="continue">继续</button>
+                <button type="button" class="rer-button" data-rer-action="settings">设置</button>
             </div>
         `;
         statusNode = toolbarRoot.querySelector('[data-rer-status]');
-        progressNode = toolbarRoot.querySelector('[data-rer-progress]');
-        progressBarNode = toolbarRoot.querySelector('[data-rer-progress-bar]');
         toolbarRoot.addEventListener('click', handleToolbarClick);
         document.documentElement.append(toolbarRoot);
-        updateProgress();
+        updateLoadedCount();
     }
 
     function handleToolbarClick(event) {
         const button = event.target.closest('[data-rer-action]');
         if (!button) return;
         const action = button.getAttribute('data-rer-action');
-        if (action === 'toggle') {
-            setToolbarCollapsed(!toolbarRoot.classList.contains('rer-toolbar-collapsed'));
-        } else if (action === 'settings') {
+        if (action === 'settings') {
             showSettings();
-        } else if (action === 'analyze') {
+        } else if (action === 'continue') {
             analyzeSentences();
-        } else if (action === 'expand') {
-            toggleAllDetails(button);
-        } else if (action === 'collapse') {
-            setToolbarCollapsed(true);
         }
     }
 
-    function setToolbarCollapsed(collapsed) {
-        if (!toolbarRoot) return;
-        toolbarRoot.classList.toggle('rer-toolbar-collapsed', collapsed);
-        toolbarRoot.querySelector('[data-rer-action="toggle"]').setAttribute('aria-expanded', String(!collapsed));
-        toolbarRoot.querySelector('[data-rer-toolbar-body]').hidden = collapsed;
-    }
-
-    function setStatus(message) {
-        if (statusNode) statusNode.textContent = message;
-    }
-
-    function updateProgress() {
-        const connected = Array.from(sentences.values()).filter((item) => item.node.isConnected);
-        const ready = connected.filter((item) => item.ready).length;
-        const total = connected.length;
-        if (progressNode) progressNode.textContent = `${ready}/${total}`;
-        if (progressBarNode) progressBarNode.style.width = `${total ? Math.round((ready / total) * 100) : 0}%`;
-    }
-
-    function updateStatusFromState() {
-        const connected = Array.from(sentences.values()).filter((item) => item.node.isConnected);
-        const ready = connected.filter((item) => item.ready).length;
-        updateProgress();
-        if (!getConfigReady()) {
-            setStatus('请在设置中填写 API 地址、key 和模型。');
-        } else if (!connected.length) {
-            setStatus('正在等待 Reuters 正文。');
-        } else if (ready === connected.length) {
-            setStatus(`精读已就绪，共 ${ready} 句。`);
-        } else {
-            setStatus(`已就绪 ${ready}/${connected.length} 句。`);
-        }
+    function updateLoadedCount() {
+        const ready = getConnectedReadingItems().filter((item) => item.ready).length;
+        if (statusNode) statusNode.textContent = `已加载 ${ready} 句`;
     }
 
     function registerMenu() {
         if (typeof GM_registerMenuCommand !== 'function') return;
         GM_registerMenuCommand('Reuters Reader: 设置', showSettings);
-        GM_registerMenuCommand('Reuters Reader: 展开工具条', () => {
-            buildToolbar();
-            setToolbarCollapsed(false);
-            updateStatusFromState();
-        });
-        GM_registerMenuCommand('Reuters Reader: 加载缺失精读', () => analyzeSentences());
+        GM_registerMenuCommand('Reuters Reader: 继续精读', () => analyzeSentences());
     }
 
     function showSettings() {
@@ -1000,9 +840,13 @@
                 <div class="rer-settings-section">
                     <div class="rer-settings-section-title">阅读行为</div>
                     ${renderSettingSwitch('rer-enabled', '启用精读', '刷新页面后完整生效')}
-                    ${renderSettingSwitch('rer-auto', '自动加载', '首次打开文章时准备全部句子')}
+                    ${renderSettingSwitch('rer-auto', '自动加载', '首次打开文章时只准备第一批')}
                     ${renderSettingSwitch('rer-expanded', '默认展开', '加载完成后直接显示句子精读')}
-                    ${renderSettingSwitch('rer-toolbar-collapsed', '默认收起工具条', '打开文章时仅显示右上角精读按钮')}
+                    <div class="rer-field">
+                        <label for="rer-sentences-per-load">每批句数</label>
+                        <input id="rer-sentences-per-load" type="number" min="1" max="10" step="1" inputmode="numeric">
+                        <div class="rer-help">首次自动加载和每次“继续”使用相同数量，范围 1-10 句。</div>
+                    </div>
                 </div>
             </div>
             <div class="rer-settings-footer">
@@ -1020,13 +864,14 @@
         const endpointInput = panel.querySelector('#rer-endpoint');
         const keyInput = panel.querySelector('#rer-key');
         const modelInput = panel.querySelector('#rer-model');
+        const sentencesPerLoadInput = panel.querySelector('#rer-sentences-per-load');
         endpointInput.value = config.endpoint || '';
         keyInput.value = config.apiKey || '';
         modelInput.value = config.model || DEFAULT_MODEL;
+        sentencesPerLoadInput.value = String(config.sentencesPerLoad);
         panel.querySelector('#rer-enabled').checked = Boolean(config.enabled);
         panel.querySelector('#rer-auto').checked = Boolean(config.autoAnalyze);
         panel.querySelector('#rer-expanded').checked = Boolean(config.defaultExpanded);
-        panel.querySelector('#rer-toolbar-collapsed').checked = Boolean(config.toolbarCollapsed);
 
         backdrop.addEventListener('click', closeSettings);
         panel.addEventListener('click', (event) => {
@@ -1043,14 +888,13 @@
                 enabled: panel.querySelector('#rer-enabled').checked,
                 autoAnalyze: panel.querySelector('#rer-auto').checked,
                 defaultExpanded: panel.querySelector('#rer-expanded').checked,
-                toolbarCollapsed: panel.querySelector('#rer-toolbar-collapsed').checked,
+                sentencesPerLoad: sentencesPerLoadInput.value,
                 targetLanguage: DEFAULT_CONFIG.targetLanguage
             };
             saveConfig(nextConfig);
             closeSettings();
             buildToolbar();
-            setToolbarCollapsed(config.toolbarCollapsed);
-            updateStatusFromState();
+            updateLoadedCount();
             if (config.enabled && config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         });
         endpointInput.focus();
@@ -1096,20 +940,24 @@
         if (!config.enabled) return;
         const root = findArticleRoot();
         if (!root) {
-            updateStatusFromState();
+            updateLoadedCount();
             return;
         }
-        articleRoot = root;
-        const paragraphs = collectParagraphs(root);
+        const readingElements = collectReadingElements(root);
         let changed = 0;
-        for (const paragraph of paragraphs) {
-            if (paragraph.dataset.rerParagraph === 'true') continue;
-            const text = normalizeReadingText(paragraph.textContent);
-            if (!shouldProcessParagraph(text, paragraph)) continue;
-            const parts = segmentSentences(text);
+        for (const { element, isHeadline } of readingElements) {
+            if (element.dataset.rerReadingElement === 'true') continue;
+            const text = normalizeReadingText(element.textContent);
+            if (!shouldProcessReadingElement(text, element, isHeadline)) continue;
+            const parts = isHeadline ? [text] : segmentSentences(text);
             if (!parts.length) continue;
-            paragraph.textContent = '';
-            paragraph.dataset.rerParagraph = 'true';
+            element.textContent = '';
+            element.dataset.rerReadingElement = 'true';
+            if (isHeadline) {
+                element.classList.add('rer-reading-title');
+            } else {
+                element.dataset.rerParagraph = 'true';
+            }
             for (const sentenceText of parts) {
                 const id = `${SENTENCE_PREFIX}-${++sentenceCounter}`;
                 const block = document.createElement('span');
@@ -1125,7 +973,7 @@
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
                 toggleNode.innerHTML = `
                     <span class="rer-detail-rule"></span>
-                    <span class="rer-detail-toggle-label">精读加载中</span>
+                    <span class="rer-detail-toggle-label">精读尚未加载</span>
                     <span class="rer-detail-chevron" aria-hidden="true"></span>
                 `;
                 const detailNode = document.createElement('span');
@@ -1134,10 +982,11 @@
                 detailNode.hidden = !config.defaultExpanded;
                 detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
                 block.append(sentenceNode, toggleNode, detailNode);
-                paragraph.append(block);
+                element.append(block);
                 const item = {
                     id,
                     text: sentenceText,
+                    order: sentenceCounter,
                     node: sentenceNode,
                     toggleNode,
                     detailNode,
@@ -1150,7 +999,7 @@
             changed += 1;
         }
         if (changed > 0) {
-            updateStatusFromState();
+            updateLoadedCount();
             if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         }
     }
@@ -1170,6 +1019,34 @@
         return null;
     }
 
+    function collectReadingElements(root) {
+        const headline = findHeadline(root);
+        const elements = [];
+        if (headline) elements.push({ element: headline, isHeadline: true });
+        for (const paragraph of collectParagraphs(root)) {
+            if (paragraph !== headline) elements.push({ element: paragraph, isHeadline: false });
+        }
+        return elements;
+    }
+
+    function findHeadline(root) {
+        const candidates = [
+            root.matches('h1') ? root : null,
+            root.querySelector('h1'),
+            document.querySelector('main h1'),
+            document.querySelector('h1[data-testid*="heading" i]'),
+            document.querySelector('article h1'),
+            document.querySelector('h1')
+        ];
+        return candidates.find((node) => {
+            if (!(node instanceof HTMLElement)) return false;
+            const text = normalizeReadingText(node.textContent);
+            if (text.length < 12 || !/[A-Za-z]/.test(text)) return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 || rect.height > 0;
+        }) || null;
+    }
+
     function collectParagraphs(root) {
         const candidates = Array.from(root.querySelectorAll([
             '[data-testid*="paragraph" i]',
@@ -1186,13 +1063,26 @@
         return unique;
     }
 
-    function shouldProcessParagraph(text, paragraph) {
-        if (!text || text.length < 45 || !/[A-Za-z]/.test(text)) return false;
-        if (paragraph.closest('.rer-toolbar, .rer-settings, nav, footer, aside, form, button')) return false;
-        if (paragraph.querySelector('time, button, input, textarea, select')) return false;
-        const rect = paragraph.getBoundingClientRect();
+    function shouldProcessReadingElement(text, element, isHeadline) {
+        const minimumLength = isHeadline ? 12 : 45;
+        if (!text || text.length < minimumLength || !/[A-Za-z]/.test(text)) return false;
+        if (element.closest('.rer-toolbar, .rer-settings, nav, footer, aside, form, button')) return false;
+        if (element.querySelector('time, button, input, textarea, select')) return false;
+        const rect = element.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return false;
         return !/^(our standards|click here|sign up|reporting by|editing by)\b/i.test(text);
+    }
+
+    function getConnectedReadingItems() {
+        return Array.from(sentences.values())
+            .filter((item) => item.node.isConnected)
+            .sort((left, right) => {
+                if (left.node === right.node) return 0;
+                const position = left.node.compareDocumentPosition(right.node);
+                if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+                if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+                return left.order - right.order;
+            });
     }
 
     function normalizeReadingText(value) {
@@ -1243,14 +1133,6 @@
         updateDetailToggleLabel(item);
     }
 
-    function toggleAllDetails(button) {
-        allDetailsExpanded = !allDetailsExpanded;
-        for (const item of sentences.values()) {
-            if (item.node.isConnected) setDetailExpanded(item, allDetailsExpanded);
-        }
-        button.textContent = allDetailsExpanded ? '全部收起' : '全部展开';
-    }
-
     function updateDetailToggleLabel(item) {
         const label = item.toggleNode.querySelector('.rer-detail-toggle-label');
         const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
@@ -1264,15 +1146,26 @@
     }
 
     function queueAutoAnalyze() {
+        const articleKey = `${location.origin}${location.pathname}`;
+        if (autoAnalyzedArticleKey === articleKey) return;
         window.clearTimeout(autoAnalyzeTimer);
-        autoAnalyzeTimer = window.setTimeout(() => analyzeSentences(), 350);
+        autoAnalyzeQueuedKey = articleKey;
+        autoAnalyzeTimer = window.setTimeout(() => {
+            if (autoAnalyzeQueuedKey !== articleKey
+                || articleKey !== `${location.origin}${location.pathname}`
+                || !config.enabled
+                || !config.autoAnalyze
+                || !getConfigReady()) return;
+            autoAnalyzeQueuedKey = '';
+            autoAnalyzedArticleKey = articleKey;
+            analyzeSentences({ automatic: true });
+        }, 700);
     }
 
     function restoreCachedAnalysis(item) {
         const cached = analysisCache[getSentenceCacheKey(item.text)];
         if (!cached || cached.text !== item.text || !cached.translation) return false;
-        applyAnalysisResult({ ...cached, id: item.id }, false);
-        return true;
+        return applyAnalysisResult({ ...cached, id: item.id }, false);
     }
 
     function getSentenceCacheKey(text) {
@@ -1299,23 +1192,24 @@
     function ensureReady() {
         if (getConfigReady()) return true;
         showSettings();
-        setStatus('需要先填写 API 地址、key 和模型。');
         return false;
     }
 
-    async function analyzeSentences() {
+    async function analyzeSentences(options = {}) {
         if (analyzeRunning || !config.enabled) return;
         if (!ensureReady()) return;
         enhanceArticle();
-        const pending = Array.from(sentences.values())
-            .filter((item) => item.node.isConnected && !item.ready)
-            .slice(0, MAX_ANALYSIS_SENTENCES);
+        const ordered = getConnectedReadingItems();
+        const candidates = options.automatic
+            ? ordered.slice(0, config.sentencesPerLoad)
+            : ordered.filter((item) => !item.ready).slice(0, config.sentencesPerLoad);
+        const pending = candidates.filter((item) => !item.ready && !item.loading);
         if (!pending.length) {
-            updateStatusFromState();
+            updateLoadedCount();
             return;
         }
         analyzeRunning = true;
-        setAnalyzeButtonState(true);
+        setContinueButtonState(true);
         for (const item of pending) {
             item.loading = true;
             setDetailMessage(item, '正在后台准备本句精读...');
@@ -1326,41 +1220,33 @@
             batches.push(pending.slice(index, index + ANALYSIS_BATCH_SIZE));
         }
         let nextBatch = 0;
-        let completed = 0;
-        const failures = [];
+        const failures = new Set();
         const worker = async () => {
             while (nextBatch < batches.length) {
                 const batch = batches[nextBatch++];
                 try {
                     const results = await analyzeBatchWithFallback(batch);
-                    const resultIds = new Set();
+                    const appliedIds = new Set();
                     for (const result of results) {
                         if (!result || !result.id) continue;
-                        resultIds.add(result.id);
-                        applyAnalysisResult(result, true);
+                        if (applyAnalysisResult(result, true)) appliedIds.add(result.id);
                     }
                     for (const item of batch) {
-                        if (!resultIds.has(item.id)) failures.push(item);
+                        if (!appliedIds.has(item.id)) failures.add(item);
                     }
                     saveAnalysisCache();
                 } catch (error) {
-                    for (const item of batch) failures.push(item);
+                    for (const item of batch) failures.add(item);
                     console.warn('[Reuters English Reader] Analysis batch failed', error);
                 }
-                completed += batch.length;
-                setStatus(`正在准备精读 ${Math.min(completed, pending.length)}/${pending.length}...`);
-                updateProgress();
+                updateLoadedCount();
             }
         };
         try {
             const workerCount = Math.min(ANALYSIS_CONCURRENCY, batches.length);
             await Promise.all(Array.from({ length: workerCount }, () => worker()));
             saveAnalysisCache();
-            if (failures.length) {
-                setStatus(`已完成 ${pending.length - failures.length}/${pending.length} 句，${failures.length} 句可点击“加载缺失”重试。`);
-            } else {
-                updateStatusFromState();
-            }
+            if (failures.size) console.info(`[Reuters English Reader] ${failures.size} sentence(s) remain unloaded.`);
         } finally {
             for (const item of pending) {
                 item.loading = false;
@@ -1368,8 +1254,8 @@
                 updateDetailToggleLabel(item);
             }
             analyzeRunning = false;
-            setAnalyzeButtonState(false);
-            updateProgress();
+            setContinueButtonState(false);
+            updateLoadedCount();
         }
     }
 
@@ -1392,9 +1278,9 @@
         }
     }
 
-    function setAnalyzeButtonState(disabled) {
+    function setContinueButtonState(disabled) {
         if (!toolbarRoot) return;
-        const button = toolbarRoot.querySelector('[data-rer-action="analyze"]');
+        const button = toolbarRoot.querySelector('[data-rer-action="continue"]');
         if (button) button.disabled = disabled;
     }
 
@@ -1446,23 +1332,34 @@
     }
 
     function applyAnalysisResult(result, persist) {
-        if (!result || typeof result !== 'object') return;
+        if (!result || typeof result !== 'object') return false;
         const item = sentences.get(result.id);
-        if (!item || !item.node) return;
+        if (!item
+            || !item.node
+            || !item.node.isConnected
+            || !item.toggleNode.isConnected
+            || !item.detailNode.isConnected) return false;
         const translation = normalizeReadingText(result.translation || result.text || '');
-        if (!translation) return;
+        if (!translation) return false;
         const phrases = sanitizePhrases(result.phrases);
         const spans = sanitizeSpans(result.spans, item.text);
         const pattern = deriveStructurePattern(spans);
         const normalized = { translation, phrases, pattern, spans };
-        renderSentenceWithSpans(item.node, item.text, spans);
-        renderSentenceDetail(item, normalized);
+        try {
+            renderSentenceWithSpans(item.node, item.text, spans);
+            renderSentenceDetail(item, normalized);
+        } catch (error) {
+            console.warn('[Reuters English Reader] Failed to render sentence analysis', error);
+            return false;
+        }
+        if (item.node.textContent !== item.text || !item.detailNode.textContent.includes(translation)) return false;
         item.ready = true;
         item.loading = false;
         item.node.classList.add('rer-analyzed');
         item.toggleNode.classList.add('rer-detail-ready');
         updateDetailToggleLabel(item);
         if (persist) cacheAnalysis(item, normalized);
+        return true;
     }
 
     function sanitizePhrases(phrases) {
