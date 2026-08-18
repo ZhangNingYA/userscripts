@@ -3,10 +3,10 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.2
-// @description  Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
-// @description:zh-CN 为 Reuters 英文新闻提供逐句区分、单词释义、选句翻译和句子主干标亮，API 信息由使用者本地配置。
-// @description:en Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
+// @version      0.2.0
+// @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
+// @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
+// @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @author       ZhangNingYA
 // @homepageURL  https://scripts.fulafu.com/scripts/reuters-english-reader/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
@@ -26,143 +26,283 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.2';
-    const SCRIPT_RELEASED_AT = '2026-08-18 13:30:44 UTC+8';
-    const CONFIG_KEY = 'reuters-english-reader-config-v1';
+    const SCRIPT_VERSION = '0.2.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 13:47:02 UTC+8';
+    const CONFIG_KEY = 'reuters-english-reader-config-v2';
+    const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
+    const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v1';
     const SENTENCE_PREFIX = 'rer-s';
     const MAX_ANALYSIS_SENTENCES = 80;
     const ANALYSIS_BATCH_SIZE = 3;
+    const ANALYSIS_CONCURRENCY = 2;
+    const CACHE_LIMIT = 400;
     const REQUEST_TIMEOUT_MS = 120000;
     const REQUEST_MAX_ATTEMPTS = 2;
     const REQUEST_RETRY_DELAY_MS = 1000;
+    const REASONING_EFFORT = 'low';
     const DEFAULT_MODEL = 'gpt-5.6-luna';
     const DEFAULT_CONFIG = {
         endpoint: '',
         apiKey: '',
         model: DEFAULT_MODEL,
-        autoAnalyze: false,
+        enabled: true,
+        autoAnalyze: true,
+        defaultExpanded: false,
+        showToolbar: true,
         targetLanguage: 'Simplified Chinese'
     };
     const ROLE_CLASS = {
         subject: 'rer-role-subject',
         predicate: 'rer-role-predicate',
         object: 'rer-role-object',
-        complement: 'rer-role-complement',
-        modifier: 'rer-role-modifier',
-        connector: 'rer-role-connector'
+        complement: 'rer-role-complement'
     };
     const ROLE_LABEL = {
         subject: '主语',
         predicate: '谓语',
         object: '宾语',
-        complement: '补语',
-        modifier: '修饰',
-        connector: '连接'
+        complement: '补语'
     };
 
     let config = loadConfig();
+    let analysisCache = loadAnalysisCache();
     let sentenceCounter = 0;
     let articleRoot = null;
     let toolbarRoot = null;
     let settingsRoot = null;
-    let popoverRoot = null;
     let statusNode = null;
-    let pendingSelectionTimer = 0;
+    let progressNode = null;
+    let progressBarNode = null;
     let analyzeRunning = false;
+    let autoAnalyzeTimer = 0;
+    let allDetailsExpanded = false;
     const sentences = new Map();
 
     const css = String.raw`
         :root {
-            --rer-bg: #fffdf8;
-            --rer-ink: #1f2933;
-            --rer-muted: #5d6875;
-            --rer-line: rgba(58, 69, 82, 0.18);
-            --rer-accent: #0b6b64;
-            --rer-accent-strong: #064e49;
-            --rer-warm: #a5481c;
+            --rer-ink: #18222d;
+            --rer-muted: #63707d;
+            --rer-line: rgba(38, 52, 66, 0.16);
+            --rer-accent: #08796f;
+            --rer-accent-strong: #055c56;
+            --rer-warm: #a44b27;
             --rer-panel: #ffffff;
-            --rer-shadow: 0 14px 36px rgba(22, 31, 45, 0.18);
+            --rer-soft: #f4f8f7;
+            --rer-shadow: 0 16px 42px rgba(25, 38, 51, 0.2);
         }
 
         html.rer-reading-active article p[data-rer-paragraph="true"],
         html.rer-reading-active main p[data-rer-paragraph="true"] {
-            line-height: 1.78 !important;
+            line-height: 1.72 !important;
+        }
+
+        .rer-sentence-block {
+            display: block;
+            box-sizing: border-box;
+            margin: 0.62em 0 0.78em;
+            color: inherit;
         }
 
         .rer-sentence {
             display: block;
             box-sizing: border-box;
-            margin: 0.48em 0;
-            padding: 0.42em 0.58em 0.46em;
-            border-left: 3px solid rgba(11, 107, 100, 0.55);
+            padding: 0.48em 0.62em 0.52em;
+            border-left: 3px solid rgba(8, 121, 111, 0.5);
             border-bottom: 1px solid var(--rer-line);
-            border-radius: 6px;
-            background: rgba(255, 253, 248, 0.82);
+            border-radius: 6px 6px 3px 3px;
+            background: rgba(249, 251, 250, 0.92);
             color: inherit;
             letter-spacing: 0 !important;
-            transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+            transition: border-color 140ms ease, background-color 140ms ease;
         }
 
-        .rer-sentence:nth-of-type(2n) {
-            border-left-color: rgba(165, 72, 28, 0.48);
-            background: rgba(246, 249, 249, 0.82);
-        }
-
-        .rer-sentence:hover {
-            background: rgba(236, 248, 246, 0.9);
-            box-shadow: inset 0 0 0 1px rgba(11, 107, 100, 0.22);
+        .rer-sentence-block:nth-child(2n) .rer-sentence {
+            border-left-color: rgba(164, 75, 39, 0.48);
+            background: rgba(252, 250, 247, 0.9);
         }
 
         .rer-sentence.rer-analyzed {
-            border-left-color: rgba(11, 107, 100, 0.88);
+            border-left-color: rgba(8, 121, 111, 0.9);
         }
 
         .rer-structure {
-            border-radius: 4px;
-            padding: 0.02em 0.06em 0.04em;
+            border-radius: 3px;
+            padding: 0.01em 0.04em 0.03em;
             text-decoration-line: underline;
             text-decoration-thickness: 2px;
-            text-underline-offset: 0.18em;
+            text-underline-offset: 0.2em;
             box-decoration-break: clone;
             -webkit-box-decoration-break: clone;
         }
 
         .rer-role-subject {
-            background: rgba(22, 119, 255, 0.12);
+            background: rgba(22, 119, 255, 0.1);
             text-decoration-color: #1677ff;
         }
 
         .rer-role-predicate {
-            background: rgba(214, 68, 88, 0.13);
-            text-decoration-color: #d64458;
+            background: rgba(205, 55, 75, 0.1);
+            text-decoration-color: #cd374b;
         }
 
         .rer-role-object {
-            background: rgba(21, 128, 61, 0.13);
+            background: rgba(21, 128, 61, 0.1);
             text-decoration-color: #15803d;
         }
 
         .rer-role-complement {
-            background: rgba(126, 87, 194, 0.14);
-            text-decoration-color: #7e57c2;
+            background: rgba(116, 76, 184, 0.1);
+            text-decoration-color: #744cb8;
         }
 
-        .rer-role-modifier {
-            background: rgba(199, 125, 0, 0.14);
-            text-decoration-color: #c77d00;
+        .rer-detail-toggle {
+            display: flex;
+            box-sizing: border-box;
+            align-items: center;
+            width: 100%;
+            min-height: 32px;
+            gap: 9px;
+            margin: 0;
+            padding: 0 0.4em 0 0.62em;
+            border: 0;
+            border-radius: 0 0 6px 6px;
+            background: transparent;
+            color: var(--rer-muted);
+            cursor: pointer;
+            font: 600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            letter-spacing: 0;
+            text-align: left;
+            touch-action: manipulation;
         }
 
-        .rer-role-connector {
-            background: rgba(12, 124, 156, 0.14);
-            text-decoration-color: #0c7c9c;
+        .rer-detail-toggle:hover,
+        .rer-detail-toggle:focus-visible {
+            background: rgba(8, 121, 111, 0.06);
+            color: var(--rer-accent-strong);
+            outline: none;
         }
+
+        .rer-detail-rule {
+            height: 1px;
+            flex: 1;
+            background: var(--rer-line);
+        }
+
+        .rer-detail-toggle-label {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .rer-detail-chevron {
+            width: 7px;
+            height: 7px;
+            flex: 0 0 auto;
+            border-right: 1.5px solid currentColor;
+            border-bottom: 1.5px solid currentColor;
+            transform: rotate(45deg) translateY(-2px);
+            transition: transform 140ms ease;
+        }
+
+        .rer-detail-toggle[aria-expanded="true"] .rer-detail-chevron {
+            transform: rotate(225deg) translate(-1px, -1px);
+        }
+
+        .rer-detail-toggle.rer-detail-ready {
+            color: var(--rer-accent);
+        }
+
+        .rer-detail-panel {
+            display: block;
+            box-sizing: border-box;
+            margin: 0 0 0.34em;
+            padding: 0.25em 0.72em 0.72em;
+            border-left: 3px solid rgba(8, 121, 111, 0.24);
+            border-bottom: 1px solid rgba(38, 52, 66, 0.12);
+            border-radius: 0 0 6px 6px;
+            background: rgba(244, 248, 247, 0.72);
+            color: var(--rer-ink);
+            font: 13px/1.58 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            letter-spacing: 0;
+        }
+
+        .rer-detail-panel[hidden] {
+            display: none !important;
+        }
+
+        .rer-detail-section {
+            display: grid;
+            grid-template-columns: 62px minmax(0, 1fr);
+            gap: 10px;
+            padding: 0.52em 0;
+            border-bottom: 1px solid rgba(38, 52, 66, 0.1);
+        }
+
+        .rer-detail-section:last-child {
+            border-bottom: 0;
+            padding-bottom: 0.2em;
+        }
+
+        .rer-detail-heading {
+            color: var(--rer-muted);
+            font-size: 11px;
+            font-weight: 750;
+        }
+
+        .rer-detail-content {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .rer-phrase-list,
+        .rer-structure-list {
+            display: grid;
+            gap: 5px;
+        }
+
+        .rer-phrase-row,
+        .rer-structure-row {
+            display: grid;
+            grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+            gap: 8px;
+            align-items: baseline;
+        }
+
+        .rer-phrase-text {
+            color: var(--rer-ink);
+            font-weight: 700;
+        }
+
+        .rer-phrase-meaning {
+            color: var(--rer-muted);
+        }
+
+        .rer-role-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--rer-muted);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .rer-role-label::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #8a96a3;
+        }
+
+        .rer-role-label[data-role="subject"]::before { background: #1677ff; }
+        .rer-role-label[data-role="predicate"]::before { background: #cd374b; }
+        .rer-role-label[data-role="object"]::before { background: #15803d; }
+        .rer-role-label[data-role="complement"]::before { background: #744cb8; }
 
         .rer-toolbar,
-        .rer-popover,
         .rer-settings {
             box-sizing: border-box;
             color: var(--rer-ink);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             letter-spacing: 0;
             z-index: 2147483646;
         }
@@ -171,190 +311,295 @@
             position: fixed;
             top: 72px;
             right: 18px;
-            width: min(326px, calc(100vw - 24px));
-            padding: 9px;
-            border: 1px solid rgba(31, 41, 51, 0.16);
+            width: min(336px, calc(100vw - 24px));
+            border: 1px solid rgba(38, 52, 66, 0.17);
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.97);
             box-shadow: var(--rer-shadow);
             backdrop-filter: blur(12px);
+            overflow: hidden;
         }
 
-        .rer-toolbar-row {
+        .rer-toolbar.rer-toolbar-collapsed {
+            width: auto;
+            max-width: calc(100vw - 24px);
+        }
+
+        .rer-toolbar-toggle {
             display: flex;
             align-items: center;
-            gap: 8px;
-            min-width: 0;
+            width: 100%;
+            min-height: 44px;
+            gap: 9px;
+            padding: 7px 10px;
+            border: 0;
+            background: transparent;
+            color: var(--rer-ink);
+            cursor: pointer;
+            font: inherit;
+            text-align: left;
+            touch-action: manipulation;
+        }
+
+        .rer-toolbar-toggle:hover,
+        .rer-toolbar-toggle:focus-visible {
+            background: rgba(8, 121, 111, 0.06);
+            outline: none;
+        }
+
+        .rer-toolbar-mark {
+            display: inline-grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            flex: 0 0 auto;
+            border-radius: 6px;
+            background: var(--rer-accent);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 800;
         }
 
         .rer-toolbar-title {
-            min-width: 0;
             flex: 1;
+            min-width: 0;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 750;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .rer-version {
             color: var(--rer-muted);
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
         }
 
-        .rer-status {
-            margin-top: 7px;
+        .rer-progress-count {
+            flex: 0 0 auto;
             color: var(--rer-muted);
             font-size: 11px;
-            line-height: 1.35;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .rer-toolbar-chevron {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 auto;
+            margin: 0 3px 4px 1px;
+            border-right: 1.5px solid var(--rer-muted);
+            border-bottom: 1.5px solid var(--rer-muted);
+            transform: rotate(45deg);
+            transition: transform 150ms ease;
+        }
+
+        .rer-toolbar:not(.rer-toolbar-collapsed) .rer-toolbar-chevron {
+            margin-bottom: 0;
+            transform: rotate(225deg);
+        }
+
+        .rer-toolbar-body {
+            padding: 0 11px 11px;
+            border-top: 1px solid rgba(38, 52, 66, 0.1);
+        }
+
+        .rer-toolbar-body[hidden] {
+            display: none !important;
+        }
+
+        .rer-status {
+            min-height: 34px;
+            padding: 9px 1px 7px;
+            color: var(--rer-muted);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .rer-progress-track {
+            height: 3px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            border-radius: 3px;
+            background: rgba(38, 52, 66, 0.1);
+        }
+
+        .rer-progress-bar {
+            display: block;
+            width: 0;
+            height: 100%;
+            background: var(--rer-accent);
+            transition: width 180ms ease;
+        }
+
+        .rer-toolbar-actions {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr 1fr;
+            gap: 7px;
         }
 
         .rer-button {
             appearance: none;
-            border: 1px solid rgba(11, 107, 100, 0.28);
+            min-width: 0;
+            min-height: 34px;
+            padding: 0 9px;
+            border: 1px solid rgba(8, 121, 111, 0.28);
             border-radius: 6px;
             background: #f7fbfa;
             color: var(--rer-accent-strong);
             cursor: pointer;
-            font: inherit;
-            font-size: 12px;
-            font-weight: 650;
-            line-height: 1;
-            min-height: 32px;
-            padding: 0 10px;
+            font: 650 12px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            letter-spacing: 0;
+            white-space: nowrap;
             touch-action: manipulation;
         }
 
-        .rer-button:hover {
-            background: #ecf8f6;
-            border-color: rgba(11, 107, 100, 0.48);
+        .rer-button:hover,
+        .rer-button:focus-visible {
+            background: #eaf6f3;
+            border-color: rgba(8, 121, 111, 0.5);
+            outline: none;
         }
 
         .rer-button:disabled {
-            cursor: not-allowed;
+            cursor: wait;
             opacity: 0.58;
         }
 
         .rer-button-primary {
-            background: var(--rer-accent);
             border-color: var(--rer-accent);
+            background: var(--rer-accent);
             color: #ffffff;
         }
 
-        .rer-button-primary:hover {
+        .rer-button-primary:hover,
+        .rer-button-primary:focus-visible {
             background: var(--rer-accent-strong);
         }
 
-        .rer-popover {
-            position: fixed;
-            max-width: min(420px, calc(100vw - 24px));
-            max-height: min(440px, calc(100vh - 24px));
-            overflow: auto;
-            padding: 12px;
-            border: 1px solid rgba(31, 41, 51, 0.16);
-            border-radius: 8px;
-            background: var(--rer-panel);
-            box-shadow: var(--rer-shadow);
-        }
-
-        .rer-popover-header {
+        .rer-toolbar-secondary {
             display: flex;
-            align-items: start;
-            gap: 12px;
-            margin-bottom: 8px;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 9px;
         }
 
-        .rer-popover-title {
-            flex: 1;
-            min-width: 0;
-            font-size: 15px;
-            font-weight: 760;
-            line-height: 1.25;
-            overflow-wrap: anywhere;
+        .rer-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px 8px;
+            color: var(--rer-muted);
+            font-size: 10px;
         }
 
-        .rer-popover-close {
+        .rer-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .rer-legend span::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #8a96a3;
+        }
+
+        .rer-legend span:nth-child(1)::before { background: #1677ff; }
+        .rer-legend span:nth-child(2)::before { background: #cd374b; }
+        .rer-legend span:nth-child(3)::before { background: #15803d; }
+        .rer-legend span:nth-child(4)::before { background: #744cb8; }
+
+        .rer-link-button {
             appearance: none;
+            min-height: 30px;
+            padding: 0 4px;
             border: 0;
-            border-radius: 6px;
             background: transparent;
             color: var(--rer-muted);
             cursor: pointer;
-            font-size: 18px;
-            line-height: 1;
-            min-height: 28px;
-            min-width: 28px;
+            font: 600 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
         }
 
-        .rer-popover-close:hover {
-            background: rgba(31, 41, 51, 0.08);
-            color: var(--rer-ink);
-        }
-
-        .rer-popover-body {
-            color: var(--rer-ink);
-            font-size: 13px;
-            line-height: 1.55;
-        }
-
-        .rer-popover-body p {
-            margin: 0 0 0.58em;
-        }
-
-        .rer-popover-body p:last-child {
-            margin-bottom: 0;
-        }
-
-        .rer-popover-list {
-            margin: 0.3em 0 0;
-            padding-left: 1.2em;
-        }
-
-        .rer-popover-list li {
-            margin: 0.16em 0;
-        }
-
-        .rer-label {
-            display: inline-flex;
-            align-items: center;
-            margin-right: 0.38em;
-            color: var(--rer-muted);
-            font-size: 12px;
-            font-weight: 650;
+        .rer-link-button:hover,
+        .rer-link-button:focus-visible {
+            color: var(--rer-accent-strong);
+            outline: none;
         }
 
         .rer-settings-backdrop {
             position: fixed;
             inset: 0;
             z-index: 2147483645;
-            background: rgba(8, 12, 18, 0.26);
+            background: rgba(12, 19, 27, 0.32);
         }
 
         .rer-settings {
             position: fixed;
             top: 72px;
             right: 16px;
-            width: min(430px, calc(100vw - 32px));
+            width: min(440px, calc(100vw - 32px));
             max-height: calc(100vh - 92px);
             overflow: auto;
-            padding: 16px;
-            border: 1px solid rgba(31, 41, 51, 0.18);
+            padding: 0;
+            border: 1px solid rgba(38, 52, 66, 0.18);
             border-radius: 8px;
             background: var(--rer-panel);
             box-shadow: var(--rer-shadow);
         }
 
-        .rer-settings h2 {
-            margin: 0 0 12px;
-            font-size: 18px;
+        .rer-settings-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(38, 52, 66, 0.11);
+        }
+
+        .rer-settings-header h2 {
+            flex: 1;
+            margin: 0;
+            font-size: 17px;
             line-height: 1.25;
+        }
+
+        .rer-settings-close {
+            appearance: none;
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--rer-muted);
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .rer-settings-close:hover,
+        .rer-settings-close:focus-visible {
+            background: rgba(38, 52, 66, 0.07);
+            outline: none;
+        }
+
+        .rer-settings-body {
+            padding: 14px 16px 4px;
+        }
+
+        .rer-settings-section {
+            margin-bottom: 16px;
+        }
+
+        .rer-settings-section-title {
+            margin: 0 0 8px;
+            color: var(--rer-muted);
+            font-size: 11px;
+            font-weight: 750;
         }
 
         .rer-field {
             display: grid;
             gap: 5px;
-            margin: 12px 0;
+            margin: 10px 0;
         }
 
         .rer-field label {
@@ -367,116 +612,177 @@
         .rer-field input[type="password"] {
             box-sizing: border-box;
             width: 100%;
-            min-height: 36px;
-            border: 1px solid rgba(31, 41, 51, 0.18);
-            border-radius: 6px;
+            min-height: 38px;
             padding: 7px 9px;
+            border: 1px solid rgba(38, 52, 66, 0.2);
+            border-radius: 6px;
             color: var(--rer-ink);
-            font: inherit;
-            font-size: 13px;
+            font: 13px/1.3 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            letter-spacing: 0;
         }
 
         .rer-field input:focus {
-            border-color: rgba(11, 107, 100, 0.62);
-            outline: 2px solid rgba(11, 107, 100, 0.16);
+            border-color: rgba(8, 121, 111, 0.7);
+            outline: 2px solid rgba(8, 121, 111, 0.14);
         }
 
         .rer-help {
             color: var(--rer-muted);
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.45;
         }
 
-        .rer-checkbox {
+        .rer-setting-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin: 12px 0;
+            gap: 12px;
+            min-height: 44px;
+            border-bottom: 1px solid rgba(38, 52, 66, 0.09);
+        }
+
+        .rer-setting-row:last-child {
+            border-bottom: 0;
+        }
+
+        .rer-setting-copy {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .rer-setting-name {
             color: var(--rer-ink);
             font-size: 13px;
+            font-weight: 650;
+        }
+
+        .rer-switch {
+            position: relative;
+            width: 38px;
+            height: 22px;
+            flex: 0 0 auto;
+        }
+
+        .rer-switch input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+        }
+
+        .rer-switch-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            background: #c9d0d6;
+            cursor: pointer;
+            transition: background-color 140ms ease;
+        }
+
+        .rer-switch-track::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(20, 30, 40, 0.25);
+            transition: transform 140ms ease;
+        }
+
+        .rer-switch input:checked + .rer-switch-track {
+            background: var(--rer-accent);
+        }
+
+        .rer-switch input:checked + .rer-switch-track::after {
+            transform: translateX(16px);
+        }
+
+        .rer-switch input:focus-visible + .rer-switch-track {
+            outline: 2px solid rgba(8, 121, 111, 0.3);
+            outline-offset: 2px;
+        }
+
+        .rer-settings-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            border-top: 1px solid rgba(38, 52, 66, 0.11);
+            background: #fafbfb;
+        }
+
+        .rer-settings-version {
+            color: var(--rer-muted);
+            font-size: 10px;
         }
 
         .rer-settings-actions {
             display: flex;
-            justify-content: flex-end;
             gap: 8px;
-            margin-top: 14px;
         }
-
-        .rer-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 7px 9px;
-            margin-top: 7px;
-        }
-
-        .rer-legend span {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            min-height: 16px;
-            color: var(--rer-muted);
-            font-size: 11px;
-            white-space: nowrap;
-        }
-
-        .rer-legend span::before {
-            content: "";
-            width: 8px;
-            height: 8px;
-            border-radius: 999px;
-            background: rgba(31, 41, 51, 0.38);
-        }
-
-        .rer-legend span:nth-child(1)::before { background: #1677ff; }
-        .rer-legend span:nth-child(2)::before { background: #d64458; }
-        .rer-legend span:nth-child(3)::before { background: #15803d; }
-        .rer-legend span:nth-child(4)::before { background: #7e57c2; }
-        .rer-legend span:nth-child(5)::before { background: #c77d00; }
-        .rer-legend span:nth-child(6)::before { background: #0c7c9c; }
 
         @media (max-width: 560px) {
             .rer-toolbar {
-                right: 12px;
                 top: 62px;
+                right: 12px;
                 width: calc(100vw - 24px);
             }
 
-            .rer-toolbar-row {
-                flex-wrap: wrap;
-            }
-
-            .rer-toolbar-title {
-                flex-basis: 100%;
-            }
-
-            .rer-button {
-                flex: 1;
+            .rer-toolbar.rer-toolbar-collapsed {
+                width: auto;
             }
 
             .rer-settings {
-                right: 10px;
                 top: 62px;
+                right: 10px;
                 width: calc(100vw - 20px);
                 max-height: calc(100vh - 72px);
+            }
+
+            .rer-detail-section {
+                grid-template-columns: 1fr;
+                gap: 3px;
+            }
+
+            .rer-phrase-row,
+            .rer-structure-row {
+                grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
             }
         }
     `;
 
     function init() {
         GM_addStyle(css);
+        registerMenu();
+        if (!config.enabled) return;
         document.documentElement.classList.add('rer-reading-active');
-        buildToolbar();
+        if (config.showToolbar) buildToolbar();
+        installInteractionHandlers();
         enhanceArticle();
         observePageChanges();
-        installInteractionHandlers();
-        registerMenu();
-        setStatus(getConfigReady() ? '已按句子整理正文。点击单词查释义，选中句子翻译。' : '请先打开设置，填写 API 地址和 key。');
+        updateStatusFromState();
     }
 
     function loadConfig() {
-        const stored = safeGetValue(CONFIG_KEY, {});
-        return { ...DEFAULT_CONFIG, ...(stored && typeof stored === 'object' ? stored : {}) };
+        const stored = safeGetValue(CONFIG_KEY, null);
+        if (stored && typeof stored === 'object') {
+            return { ...DEFAULT_CONFIG, ...stored };
+        }
+        const legacy = safeGetValue(LEGACY_CONFIG_KEY, null);
+        const migrated = legacy && typeof legacy === 'object'
+            ? {
+                ...DEFAULT_CONFIG,
+                endpoint: legacy.endpoint || '',
+                apiKey: legacy.apiKey || '',
+                model: legacy.model || DEFAULT_MODEL,
+                targetLanguage: legacy.targetLanguage || DEFAULT_CONFIG.targetLanguage
+            }
+            : { ...DEFAULT_CONFIG };
+        safeSetValue(CONFIG_KEY, migrated);
+        return migrated;
     }
 
     function saveConfig(nextConfig) {
@@ -484,11 +790,25 @@
         safeSetValue(CONFIG_KEY, config);
     }
 
+    function loadAnalysisCache() {
+        const stored = safeGetValue(ANALYSIS_CACHE_KEY, {});
+        return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    }
+
+    function saveAnalysisCache() {
+        const entries = Object.entries(analysisCache);
+        if (entries.length > CACHE_LIMIT) {
+            entries.sort((a, b) => Number(b[1] && b[1].savedAt) - Number(a[1] && a[1].savedAt));
+            analysisCache = Object.fromEntries(entries.slice(0, CACHE_LIMIT));
+        }
+        safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
+    }
+
     function safeGetValue(key, fallback) {
         try {
             return GM_getValue(key, fallback);
         } catch (error) {
-            console.warn('[Reuters English Reader] Failed to read config', error);
+            console.warn('[Reuters English Reader] Failed to read storage', error);
             return fallback;
         }
     }
@@ -497,7 +817,7 @@
         try {
             GM_setValue(key, value);
         } catch (error) {
-            console.warn('[Reuters English Reader] Failed to save config', error);
+            console.warn('[Reuters English Reader] Failed to save storage', error);
         }
     }
 
@@ -506,50 +826,109 @@
     }
 
     function buildToolbar() {
-        if (toolbarRoot) return;
+        if (toolbarRoot || !config.showToolbar) return;
         toolbarRoot = document.createElement('section');
-        toolbarRoot.className = 'rer-toolbar';
+        toolbarRoot.className = 'rer-toolbar rer-toolbar-collapsed';
         toolbarRoot.setAttribute('aria-label', 'Reuters English Reader');
         toolbarRoot.innerHTML = `
-            <div class="rer-toolbar-row">
-                <div class="rer-toolbar-title">Reuters 精读 <span class="rer-version">v${escapeHtml(SCRIPT_VERSION)}</span></div>
-                <button type="button" class="rer-button rer-button-primary" data-rer-action="analyze">结构</button>
-                <button type="button" class="rer-button" data-rer-action="settings">设置</button>
-            </div>
-            <div class="rer-status" data-rer-status>初始化中</div>
-            <div class="rer-legend" aria-label="Structure legend">
-                <span>蓝: 主语</span><span>红: 谓语</span><span>绿: 宾语</span><span>紫: 补语</span><span>橙: 修饰</span><span>青: 连接</span>
+            <button type="button" class="rer-toolbar-toggle" data-rer-action="toggle" aria-expanded="false">
+                <span class="rer-toolbar-mark" aria-hidden="true">R</span>
+                <span class="rer-toolbar-title">Reuters 精读 <span class="rer-version">v${escapeHtml(SCRIPT_VERSION)}</span></span>
+                <span class="rer-progress-count" data-rer-progress>0/0</span>
+                <span class="rer-toolbar-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="rer-toolbar-body" data-rer-toolbar-body hidden>
+                <div class="rer-status" data-rer-status>准备正文</div>
+                <div class="rer-progress-track"><span class="rer-progress-bar" data-rer-progress-bar></span></div>
+                <div class="rer-toolbar-actions">
+                    <button type="button" class="rer-button rer-button-primary" data-rer-action="analyze">加载缺失</button>
+                    <button type="button" class="rer-button" data-rer-action="expand">全部展开</button>
+                    <button type="button" class="rer-button" data-rer-action="settings">设置</button>
+                </div>
+                <div class="rer-toolbar-secondary">
+                    <div class="rer-legend" aria-label="Structure legend">
+                        <span>主语</span><span>谓语</span><span>宾语</span><span>补语</span>
+                    </div>
+                    <button type="button" class="rer-link-button" data-rer-action="hide">隐藏</button>
+                </div>
             </div>
         `;
         statusNode = toolbarRoot.querySelector('[data-rer-status]');
-        toolbarRoot.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-rer-action]');
-            if (!button) return;
-            const action = button.getAttribute('data-rer-action');
-            if (action === 'settings') {
-                showSettings();
-            } else if (action === 'analyze') {
-                analyzeSentences();
-            }
-        });
+        progressNode = toolbarRoot.querySelector('[data-rer-progress]');
+        progressBarNode = toolbarRoot.querySelector('[data-rer-progress-bar]');
+        toolbarRoot.addEventListener('click', handleToolbarClick);
         document.documentElement.append(toolbarRoot);
+        updateProgress();
+    }
+
+    function handleToolbarClick(event) {
+        const button = event.target.closest('[data-rer-action]');
+        if (!button) return;
+        const action = button.getAttribute('data-rer-action');
+        if (action === 'toggle') {
+            const collapsed = toolbarRoot.classList.toggle('rer-toolbar-collapsed');
+            button.setAttribute('aria-expanded', String(!collapsed));
+            toolbarRoot.querySelector('[data-rer-toolbar-body]').hidden = collapsed;
+        } else if (action === 'settings') {
+            showSettings();
+        } else if (action === 'analyze') {
+            analyzeSentences();
+        } else if (action === 'expand') {
+            toggleAllDetails(button);
+        } else if (action === 'hide') {
+            saveConfig({ ...config, showToolbar: false });
+            removeToolbar();
+        }
+    }
+
+    function removeToolbar() {
+        if (toolbarRoot) toolbarRoot.remove();
+        toolbarRoot = null;
+        statusNode = null;
+        progressNode = null;
+        progressBarNode = null;
     }
 
     function setStatus(message) {
         if (statusNode) statusNode.textContent = message;
     }
 
+    function updateProgress() {
+        const connected = Array.from(sentences.values()).filter((item) => item.node.isConnected);
+        const ready = connected.filter((item) => item.ready).length;
+        const total = connected.length;
+        if (progressNode) progressNode.textContent = `${ready}/${total}`;
+        if (progressBarNode) progressBarNode.style.width = `${total ? Math.round((ready / total) * 100) : 0}%`;
+    }
+
+    function updateStatusFromState() {
+        const connected = Array.from(sentences.values()).filter((item) => item.node.isConnected);
+        const ready = connected.filter((item) => item.ready).length;
+        updateProgress();
+        if (!getConfigReady()) {
+            setStatus('请在设置中填写 API 地址、key 和模型。');
+        } else if (!connected.length) {
+            setStatus('正在等待 Reuters 正文。');
+        } else if (ready === connected.length) {
+            setStatus(`精读已就绪，共 ${ready} 句。`);
+        } else {
+            setStatus(`已就绪 ${ready}/${connected.length} 句。`);
+        }
+    }
+
     function registerMenu() {
         if (typeof GM_registerMenuCommand !== 'function') return;
-        GM_registerMenuCommand('Reuters Reader: 设置 API', showSettings);
-        GM_registerMenuCommand('Reuters Reader: 分析句子结构', analyzeSentences);
+        GM_registerMenuCommand('Reuters Reader: 设置', showSettings);
+        GM_registerMenuCommand('Reuters Reader: 显示工具条', () => {
+            saveConfig({ ...config, showToolbar: true });
+            buildToolbar();
+            updateStatusFromState();
+        });
+        GM_registerMenuCommand('Reuters Reader: 加载缺失精读', () => analyzeSentences());
     }
 
     function showSettings() {
-        if (settingsRoot) {
-            settingsRoot.remove();
-            settingsRoot = null;
-        }
+        closeSettings();
         const backdrop = document.createElement('div');
         backdrop.className = 'rer-settings-backdrop';
         const panel = document.createElement('section');
@@ -558,29 +937,41 @@
         panel.setAttribute('aria-modal', 'true');
         panel.setAttribute('aria-label', 'Reuters English Reader settings');
         panel.innerHTML = `
-            <h2>Reuters 精读设置</h2>
-            <div class="rer-help">API key 只保存在本地 userscript 存储中，调用时只发送到你填写的 API 地址。</div>
-            <div class="rer-field">
-                <label for="rer-endpoint">API 地址</label>
-                <input id="rer-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="https://example.com/v1/chat/completions">
-                <div class="rer-help">支持 OpenAI-compatible 接口；可填写 base URL、/v1 或 /v1/chat/completions。</div>
+            <div class="rer-settings-header">
+                <h2>Reuters 精读设置</h2>
+                <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
             </div>
-            <div class="rer-field">
-                <label for="rer-key">API key</label>
-                <input id="rer-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+            <div class="rer-settings-body">
+                <div class="rer-settings-section">
+                    <div class="rer-settings-section-title">API</div>
+                    <div class="rer-field">
+                        <label for="rer-endpoint">API 地址</label>
+                        <input id="rer-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="https://example.com/v1/chat/completions">
+                    </div>
+                    <div class="rer-field">
+                        <label for="rer-key">API key</label>
+                        <input id="rer-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+                    </div>
+                    <div class="rer-field">
+                        <label for="rer-model">模型</label>
+                        <input id="rer-model" type="text" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(DEFAULT_MODEL)}">
+                    </div>
+                    <div class="rer-help">API key 只保存在本地 userscript 存储中。</div>
+                </div>
+                <div class="rer-settings-section">
+                    <div class="rer-settings-section-title">阅读行为</div>
+                    ${renderSettingSwitch('rer-enabled', '启用精读', '刷新页面后完整生效')}
+                    ${renderSettingSwitch('rer-auto', '自动加载', '首次打开文章时准备全部句子')}
+                    ${renderSettingSwitch('rer-expanded', '默认展开', '加载完成后直接显示句子精读')}
+                    ${renderSettingSwitch('rer-toolbar-visible', '显示工具条', '可从 userscript 菜单重新显示')}
+                </div>
             </div>
-            <div class="rer-field">
-                <label for="rer-model">模型</label>
-                <input id="rer-model" type="text" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(DEFAULT_MODEL)}">
-            </div>
-            <label class="rer-checkbox">
-                <input id="rer-auto" type="checkbox">
-                打开文章后自动分析句子结构
-            </label>
-            <div class="rer-help">版本 ${escapeHtml(SCRIPT_VERSION)} · ${escapeHtml(SCRIPT_RELEASED_AT)}</div>
-            <div class="rer-settings-actions">
-                <button type="button" class="rer-button" data-rer-settings="cancel">取消</button>
-                <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">保存</button>
+            <div class="rer-settings-footer">
+                <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)} · ${escapeHtml(SCRIPT_RELEASED_AT)}</div>
+                <div class="rer-settings-actions">
+                    <button type="button" class="rer-button" data-rer-settings="cancel">取消</button>
+                    <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">保存</button>
+                </div>
             </div>
         `;
         settingsRoot = document.createElement('div');
@@ -590,36 +981,63 @@
         const endpointInput = panel.querySelector('#rer-endpoint');
         const keyInput = panel.querySelector('#rer-key');
         const modelInput = panel.querySelector('#rer-model');
-        const autoInput = panel.querySelector('#rer-auto');
         endpointInput.value = config.endpoint || '';
         keyInput.value = config.apiKey || '';
         modelInput.value = config.model || DEFAULT_MODEL;
-        autoInput.checked = Boolean(config.autoAnalyze);
+        panel.querySelector('#rer-enabled').checked = Boolean(config.enabled);
+        panel.querySelector('#rer-auto').checked = Boolean(config.autoAnalyze);
+        panel.querySelector('#rer-expanded').checked = Boolean(config.defaultExpanded);
+        panel.querySelector('#rer-toolbar-visible').checked = Boolean(config.showToolbar);
 
-        const close = () => {
-            if (settingsRoot) settingsRoot.remove();
-            settingsRoot = null;
-        };
-        backdrop.addEventListener('click', close);
+        backdrop.addEventListener('click', closeSettings);
         panel.addEventListener('click', (event) => {
             const button = event.target.closest('[data-rer-settings]');
             if (!button) return;
-            const action = button.getAttribute('data-rer-settings');
-            if (action === 'cancel') {
-                close();
+            if (button.getAttribute('data-rer-settings') === 'cancel') {
+                closeSettings();
                 return;
             }
-            saveConfig({
+            const nextConfig = {
                 endpoint: cleanEndpoint(endpointInput.value),
                 apiKey: keyInput.value.trim(),
                 model: modelInput.value.trim() || DEFAULT_MODEL,
-                autoAnalyze: autoInput.checked,
+                enabled: panel.querySelector('#rer-enabled').checked,
+                autoAnalyze: panel.querySelector('#rer-auto').checked,
+                defaultExpanded: panel.querySelector('#rer-expanded').checked,
+                showToolbar: panel.querySelector('#rer-toolbar-visible').checked,
                 targetLanguage: DEFAULT_CONFIG.targetLanguage
-            });
-            setStatus(getConfigReady() ? '设置已保存。可以点击“结构”分析当前文章。' : '设置已保存，但 API 地址、key、模型需要填写完整。');
-            close();
+            };
+            saveConfig(nextConfig);
+            closeSettings();
+            if (!config.showToolbar) {
+                removeToolbar();
+            } else {
+                buildToolbar();
+                updateStatusFromState();
+            }
+            if (config.enabled && config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         });
         endpointInput.focus();
+    }
+
+    function renderSettingSwitch(id, name, help) {
+        return `
+            <div class="rer-setting-row">
+                <div class="rer-setting-copy">
+                    <div class="rer-setting-name">${escapeHtml(name)}</div>
+                    <div class="rer-help">${escapeHtml(help)}</div>
+                </div>
+                <label class="rer-switch">
+                    <input id="${escapeHtml(id)}" type="checkbox">
+                    <span class="rer-switch-track"></span>
+                </label>
+            </div>
+        `;
+    }
+
+    function closeSettings() {
+        if (settingsRoot) settingsRoot.remove();
+        settingsRoot = null;
     }
 
     function cleanEndpoint(value) {
@@ -639,9 +1057,10 @@
     }
 
     function enhanceArticle() {
+        if (!config.enabled) return;
         const root = findArticleRoot();
         if (!root) {
-            setStatus('还没有找到 Reuters 正文，页面加载完成后会重试。');
+            updateStatusFromState();
             return;
         }
         articleRoot = root;
@@ -655,23 +1074,48 @@
             if (!parts.length) continue;
             paragraph.textContent = '';
             paragraph.dataset.rerParagraph = 'true';
-            for (const sentence of parts) {
-                const span = document.createElement('span');
+            for (const sentenceText of parts) {
                 const id = `${SENTENCE_PREFIX}-${++sentenceCounter}`;
-                span.className = 'rer-sentence';
-                span.dataset.rerSentenceId = id;
-                span.textContent = sentence;
-                paragraph.append(span);
-                sentences.set(id, { id, text: sentence, node: span, analyzed: false });
+                const block = document.createElement('span');
+                block.className = 'rer-sentence-block';
+                const sentenceNode = document.createElement('span');
+                sentenceNode.className = 'rer-sentence';
+                sentenceNode.dataset.rerSentenceId = id;
+                sentenceNode.textContent = sentenceText;
+                const toggleNode = document.createElement('button');
+                toggleNode.type = 'button';
+                toggleNode.className = 'rer-detail-toggle';
+                toggleNode.dataset.rerSentenceToggle = id;
+                toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
+                toggleNode.innerHTML = `
+                    <span class="rer-detail-rule"></span>
+                    <span class="rer-detail-toggle-label">精读加载中</span>
+                    <span class="rer-detail-chevron" aria-hidden="true"></span>
+                `;
+                const detailNode = document.createElement('span');
+                detailNode.className = 'rer-detail-panel';
+                detailNode.dataset.rerSentenceDetail = id;
+                detailNode.hidden = !config.defaultExpanded;
+                detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
+                block.append(sentenceNode, toggleNode, detailNode);
+                paragraph.append(block);
+                const item = {
+                    id,
+                    text: sentenceText,
+                    node: sentenceNode,
+                    toggleNode,
+                    detailNode,
+                    ready: false,
+                    loading: false
+                };
+                sentences.set(id, item);
+                restoreCachedAnalysis(item);
             }
             changed += 1;
         }
         if (changed > 0) {
-            const count = sentences.size;
-            setStatus(`已整理 ${count} 个句子。点击单词查释义，选中句子翻译。`);
-            if (config.autoAnalyze && getConfigReady()) {
-                window.setTimeout(analyzeSentences, 250);
-            }
+            updateStatusFromState();
+            if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         }
     }
 
@@ -685,9 +1129,7 @@
         ];
         for (const selector of selectors) {
             const element = document.querySelector(selector);
-            if (element && element.textContent && element.textContent.trim().length > 400) {
-                return element;
-            }
+            if (element && element.textContent && element.textContent.trim().length > 400) return element;
         }
         return null;
     }
@@ -701,8 +1143,7 @@
         const unique = [];
         const seen = new Set();
         for (const node of candidates) {
-            if (!(node instanceof HTMLElement)) continue;
-            if (seen.has(node)) continue;
+            if (!(node instanceof HTMLElement) || seen.has(node)) continue;
             seen.add(node);
             unique.push(node);
         }
@@ -710,15 +1151,12 @@
     }
 
     function shouldProcessParagraph(text, paragraph) {
-        if (!text || text.length < 45) return false;
-        if (!/[A-Za-z]/.test(text)) return false;
-        if (paragraph.closest('.rer-toolbar, .rer-popover, .rer-settings, nav, footer, aside, form, button')) return false;
+        if (!text || text.length < 45 || !/[A-Za-z]/.test(text)) return false;
+        if (paragraph.closest('.rer-toolbar, .rer-settings, nav, footer, aside, form, button')) return false;
         if (paragraph.querySelector('time, button, input, textarea, select')) return false;
         const rect = paragraph.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return false;
-        const lower = text.toLowerCase();
-        if (/^(our standards|click here|sign up|reporting by|editing by)\b/.test(lower)) return false;
-        return true;
+        return !/^(our standards|click here|sign up|reporting by|editing by)\b/i.test(text);
     }
 
     function normalizeReadingText(value) {
@@ -752,137 +1190,73 @@
 
     function installInteractionHandlers() {
         document.addEventListener('click', (event) => {
-            if (event.target.closest('.rer-toolbar, .rer-popover, .rer-settings')) return;
-            const sentenceNode = event.target.closest('.rer-sentence');
-            if (!sentenceNode) return;
-            const word = getWordFromPoint(event.clientX, event.clientY);
-            if (!word) return;
-            event.preventDefault();
-            event.stopPropagation();
-            lookupWord(word, sentenceNode.textContent || '', { x: event.clientX, y: event.clientY });
-        }, true);
-
-        document.addEventListener('mouseup', queueSelectionLookup);
-        document.addEventListener('keyup', (event) => {
-            if (event.key === 'Shift' || event.key.startsWith('Arrow')) queueSelectionLookup();
+            const toggle = event.target.closest('[data-rer-sentence-toggle]');
+            if (!toggle) return;
+            const item = sentences.get(toggle.dataset.rerSentenceToggle);
+            if (!item) return;
+            setDetailExpanded(item, toggle.getAttribute('aria-expanded') !== 'true');
         });
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') hidePopover();
+            if (event.key === 'Escape') closeSettings();
         });
     }
 
-    function queueSelectionLookup() {
-        window.clearTimeout(pendingSelectionTimer);
-        pendingSelectionTimer = window.setTimeout(handleSelectionLookup, 180);
+    function setDetailExpanded(item, expanded) {
+        item.toggleNode.setAttribute('aria-expanded', String(expanded));
+        item.detailNode.hidden = !expanded;
+        updateDetailToggleLabel(item);
     }
 
-    function handleSelectionLookup() {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
-        const text = normalizeReadingText(selection.toString());
-        if (text.length < 8 || !/[A-Za-z]/.test(text)) return;
-        const range = selection.getRangeAt(0);
-        if (!selectionIntersectsReader(range)) return;
-        const rect = range.getBoundingClientRect();
-        translateSelection(text, {
-            x: rect.left + Math.min(rect.width, 220),
-            y: rect.bottom + 8
-        });
-    }
-
-    function selectionIntersectsReader(range) {
-        if (!articleRoot) return false;
-        const common = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-            ? range.commonAncestorContainer
-            : range.commonAncestorContainer.parentElement;
-        return Boolean(common && articleRoot.contains(common));
-    }
-
-    function getWordFromPoint(x, y) {
-        const range = rangeFromPoint(x, y);
-        if (!range) return '';
-        const node = range.startContainer;
-        if (!node || node.nodeType !== Node.TEXT_NODE) {
-            const text = node && node.textContent ? node.textContent : '';
-            const match = text.match(/[A-Za-z][A-Za-z'’-]*/);
-            return match ? normalizeWord(match[0]) : '';
+    function toggleAllDetails(button) {
+        allDetailsExpanded = !allDetailsExpanded;
+        for (const item of sentences.values()) {
+            if (item.node.isConnected) setDetailExpanded(item, allDetailsExpanded);
         }
-        const text = node.nodeValue || '';
-        let index = Math.min(range.startOffset, text.length - 1);
-        if (index < 0) return '';
-        if (!/[A-Za-z'’-]/.test(text[index]) && index > 0) index -= 1;
-        if (!/[A-Za-z'’-]/.test(text[index])) return '';
-        let start = index;
-        let end = index + 1;
-        while (start > 0 && /[A-Za-z'’-]/.test(text[start - 1])) start -= 1;
-        while (end < text.length && /[A-Za-z'’-]/.test(text[end])) end += 1;
-        return normalizeWord(text.slice(start, end));
+        button.textContent = allDetailsExpanded ? '全部收起' : '全部展开';
     }
 
-    function rangeFromPoint(x, y) {
-        if (document.caretRangeFromPoint) {
-            return document.caretRangeFromPoint(x, y);
-        }
-        if (document.caretPositionFromPoint) {
-            const position = document.caretPositionFromPoint(x, y);
-            if (!position) return null;
-            const range = document.createRange();
-            range.setStart(position.offsetNode, position.offset);
-            range.collapse(true);
-            return range;
-        }
-        return null;
-    }
-
-    function normalizeWord(word) {
-        return String(word || '').replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '').trim();
-    }
-
-    async function lookupWord(word, sentenceText, point) {
-        if (!ensureReady()) return;
-        showPopover(point, `查询: ${word}`, '<p>正在查询释义...</p>');
-        try {
-            const response = await requestChat({
-                system: 'You are a concise English-to-Chinese vocabulary tutor for Reuters news. Return compact JSON only.',
-                user: [
-                    'Explain this English word for a Chinese reader.',
-                    `Word: ${word}`,
-                    `Sentence: ${sentenceText}`,
-                    'Return JSON with keys: word, partOfSpeech, meaning, inSentence, note.',
-                    'Use Simplified Chinese for explanations. Keep meaning under 40 Chinese characters.'
-                ].join('\n')
-            });
-            const data = parseJsonMaybe(response);
-            const html = data && typeof data === 'object'
-                ? renderWordResult(data, word)
-                : `<p>${escapeHtml(response)}</p>`;
-            showPopover(point, `查询: ${word}`, html);
-        } catch (error) {
-            showPopover(point, `查询: ${word}`, `<p>${escapeHtml(error.message || String(error))}</p>`);
+    function updateDetailToggleLabel(item) {
+        const label = item.toggleNode.querySelector('.rer-detail-toggle-label');
+        const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
+        if (item.ready) {
+            label.textContent = expanded ? '收起本句精读' : '展开本句精读';
+        } else if (item.loading) {
+            label.textContent = '精读加载中';
+        } else {
+            label.textContent = '精读尚未加载';
         }
     }
 
-    async function translateSelection(text, point) {
-        if (!ensureReady()) return;
-        showPopover(point, '句子翻译', '<p>正在翻译...</p>');
-        try {
-            const response = await requestChat({
-                system: 'You translate Reuters English into natural Simplified Chinese. Return compact JSON only.',
-                user: [
-                    'Translate the selected English sentence or passage into Simplified Chinese.',
-                    'Keep names, numbers, organizations, and dates accurate.',
-                    'Return JSON with keys: translation, note.',
-                    `Text: ${text}`
-                ].join('\n')
-            });
-            const data = parseJsonMaybe(response);
-            const html = data && typeof data === 'object'
-                ? renderTranslationResult(data)
-                : `<p>${escapeHtml(response)}</p>`;
-            showPopover(point, '句子翻译', html);
-        } catch (error) {
-            showPopover(point, '句子翻译', `<p>${escapeHtml(error.message || String(error))}</p>`);
+    function queueAutoAnalyze() {
+        window.clearTimeout(autoAnalyzeTimer);
+        autoAnalyzeTimer = window.setTimeout(() => analyzeSentences(), 350);
+    }
+
+    function restoreCachedAnalysis(item) {
+        const cached = analysisCache[getSentenceCacheKey(item.text)];
+        if (!cached || cached.text !== item.text || !cached.translation) return false;
+        applyAnalysisResult({ ...cached, id: item.id }, false);
+        return true;
+    }
+
+    function getSentenceCacheKey(text) {
+        const value = `v1\n${config.model}\n${config.targetLanguage}\n${text}`;
+        let hash = 2166136261;
+        for (let index = 0; index < value.length; index += 1) {
+            hash ^= value.charCodeAt(index);
+            hash = Math.imul(hash, 16777619);
         }
+        return `s-${(hash >>> 0).toString(16)}`;
+    }
+
+    function cacheAnalysis(item, result) {
+        analysisCache[getSentenceCacheKey(item.text)] = {
+            text: item.text,
+            translation: result.translation,
+            phrases: result.phrases,
+            spans: result.spans,
+            savedAt: Date.now()
+        };
     }
 
     function ensureReady() {
@@ -893,35 +1267,72 @@
     }
 
     async function analyzeSentences() {
-        if (analyzeRunning) return;
+        if (analyzeRunning || !config.enabled) return;
         if (!ensureReady()) return;
         enhanceArticle();
         const pending = Array.from(sentences.values())
-            .filter((item) => item.node.isConnected && !item.analyzed)
+            .filter((item) => item.node.isConnected && !item.ready)
             .slice(0, MAX_ANALYSIS_SENTENCES);
         if (!pending.length) {
-            setStatus('当前文章没有待分析的句子。');
+            updateStatusFromState();
             return;
         }
         analyzeRunning = true;
         setAnalyzeButtonState(true);
-        try {
-            let completed = 0;
-            for (let index = 0; index < pending.length; index += ANALYSIS_BATCH_SIZE) {
-                const batch = pending.slice(index, index + ANALYSIS_BATCH_SIZE);
-                setStatus(`正在分析句子结构 ${completed}/${pending.length}...`);
-                const results = await analyzeBatchWithFallback(batch);
-                for (const result of results) {
-                    applyStructureResult(result);
+        for (const item of pending) {
+            item.loading = true;
+            setDetailMessage(item, '正在后台准备本句精读...');
+            updateDetailToggleLabel(item);
+        }
+        const batches = [];
+        for (let index = 0; index < pending.length; index += ANALYSIS_BATCH_SIZE) {
+            batches.push(pending.slice(index, index + ANALYSIS_BATCH_SIZE));
+        }
+        let nextBatch = 0;
+        let completed = 0;
+        const failures = [];
+        const worker = async () => {
+            while (nextBatch < batches.length) {
+                const batch = batches[nextBatch++];
+                try {
+                    const results = await analyzeBatchWithFallback(batch);
+                    const resultIds = new Set();
+                    for (const result of results) {
+                        if (!result || !result.id) continue;
+                        resultIds.add(result.id);
+                        applyAnalysisResult(result, true);
+                    }
+                    for (const item of batch) {
+                        if (!resultIds.has(item.id)) failures.push(item);
+                    }
+                    saveAnalysisCache();
+                } catch (error) {
+                    for (const item of batch) failures.push(item);
+                    console.warn('[Reuters English Reader] Analysis batch failed', error);
                 }
                 completed += batch.length;
+                setStatus(`正在准备精读 ${Math.min(completed, pending.length)}/${pending.length}...`);
+                updateProgress();
             }
-            setStatus(`句子结构分析完成，共处理 ${pending.length} 句。`);
-        } catch (error) {
-            setStatus(`结构分析失败：${error.message || String(error)}`);
+        };
+        try {
+            const workerCount = Math.min(ANALYSIS_CONCURRENCY, batches.length);
+            await Promise.all(Array.from({ length: workerCount }, () => worker()));
+            saveAnalysisCache();
+            if (failures.length) {
+                setStatus(`已完成 ${pending.length - failures.length}/${pending.length} 句，${failures.length} 句可点击“加载缺失”重试。`);
+            } else {
+                updateStatusFromState();
+            }
         } finally {
+            for (const item of pending) {
+                item.loading = false;
+                if (!item.ready) setDetailMessage(item, '本句精读暂未加载。');
+                updateDetailToggleLabel(item);
+            }
             analyzeRunning = false;
             setAnalyzeButtonState(false);
+            updateProgress();
         }
     }
 
@@ -929,10 +1340,9 @@
         try {
             return await analyzeBatch(batch);
         } catch (error) {
-            const canSplit = error.code === 'timeout' || error.code === 'invalid-structure';
+            const canSplit = error.code === 'timeout' || error.code === 'invalid-analysis';
             if (batch.length === 1 || !canSplit) throw error;
             const splitAt = Math.ceil(batch.length / 2);
-            setStatus(`结构分析响应较慢，正在拆分 ${batch.length} 句后重试...`);
             const first = await analyzeBatchWithFallback(batch.slice(0, splitAt));
             const second = await analyzeBatchWithFallback(batch.slice(splitAt));
             return first.concat(second);
@@ -949,63 +1359,86 @@
         const payload = batch.map(({ id, text }) => ({ id, text }));
         const response = await requestChat({
             system: [
-                'You mark the main grammatical structure of Reuters English sentences for Chinese learners.',
-                'Return JSON only. Do not include markdown.',
-                'Use exact zero-based character offsets from the original sentence text.',
-                'Allowed roles: subject, predicate, object, complement, modifier, connector.',
-                'Prefer short, important spans. Do not overlap spans for the same sentence.'
+                'You create concise Chinese reading notes for Reuters English sentences.',
+                'Return JSON only, without markdown.',
+                'For each sentence return id, translation, phrases, and spans.',
+                'phrases contains 1 to 3 difficult or important phrases as {text, meaning}.',
+                'spans uses exact zero-based character offsets and only roles subject, predicate, object, complement.',
+                'Mark only the shortest main-clause core: at most one span per role and at most four spans total.',
+                'Never mark modifiers, connectors, or the whole sentence.'
             ].join(' '),
             user: [
-                'For each sentence, identify major structure spans.',
-                'Return an array like [{"id":"...","spans":[{"start":0,"end":5,"role":"subject"}]}].',
-                'The end offset is exclusive. Keep spans exact.',
+                'Translate each sentence into natural Simplified Chinese, explain its key phrases, and identify only its core clause structure.',
+                'Return an array like [{"id":"rer-s-1","translation":"...","phrases":[{"text":"...","meaning":"..."}],"spans":[{"start":0,"end":7,"role":"subject"}]}].',
+                'Keep names, numbers, organizations, and dates accurate. Offsets must match the original text exactly.',
                 JSON.stringify(payload)
             ].join('\n')
         }, { splitOnTimeout: batch.length > 1 });
         const parsed = parseJsonMaybe(response);
         if (!Array.isArray(parsed)) {
-            throw createRequestError('模型没有返回可解析的结构 JSON。', false, 'invalid-structure');
+            throw createRequestError('模型没有返回可解析的精读 JSON。', false, 'invalid-analysis');
         }
         return parsed;
     }
 
-    function applyStructureResult(result) {
+    function applyAnalysisResult(result, persist) {
         if (!result || typeof result !== 'object') return;
-        const sentence = sentences.get(result.id);
-        if (!sentence || !sentence.node) return;
-        const spans = Array.isArray(result.spans) ? sanitizeSpans(result.spans, sentence.text) : [];
-        renderSentenceWithSpans(sentence.node, sentence.text, spans);
-        sentence.analyzed = true;
-        sentence.node.classList.add('rer-analyzed');
+        const item = sentences.get(result.id);
+        if (!item || !item.node) return;
+        const translation = normalizeReadingText(result.translation || result.text || '');
+        if (!translation) return;
+        const phrases = sanitizePhrases(result.phrases);
+        const spans = sanitizeSpans(result.spans, item.text);
+        const normalized = { translation, phrases, spans };
+        renderSentenceWithSpans(item.node, item.text, spans);
+        renderSentenceDetail(item, normalized);
+        item.ready = true;
+        item.loading = false;
+        item.node.classList.add('rer-analyzed');
+        item.toggleNode.classList.add('rer-detail-ready');
+        updateDetailToggleLabel(item);
+        if (persist) cacheAnalysis(item, normalized);
+    }
+
+    function sanitizePhrases(phrases) {
+        if (!Array.isArray(phrases)) return [];
+        return phrases
+            .map((phrase) => ({
+                text: normalizeReadingText(phrase && (phrase.text || phrase.phrase)),
+                meaning: normalizeReadingText(phrase && (phrase.meaning || phrase.explanation))
+            }))
+            .filter((phrase) => phrase.text && phrase.meaning)
+            .slice(0, 3);
     }
 
     function sanitizeSpans(spans, text) {
-        const length = text.length;
+        if (!Array.isArray(spans)) return [];
+        const seenRoles = new Set();
         return spans
             .map((span) => ({
                 start: Number(span.start),
                 end: Number(span.end),
                 role: normalizeRole(span.role)
             }))
-            .filter((span) => Number.isInteger(span.start) && Number.isInteger(span.end) && span.start >= 0 && span.end > span.start && span.end <= length && ROLE_CLASS[span.role])
+            .filter((span) => Number.isInteger(span.start)
+                && Number.isInteger(span.end)
+                && span.start >= 0
+                && span.end > span.start
+                && span.end <= text.length
+                && ROLE_CLASS[span.role])
             .sort((a, b) => a.start - b.start || b.end - a.end)
-            .reduce((acc, span) => {
-                const last = acc[acc.length - 1];
-                if (last && span.start < last.end) return acc;
-                acc.push(span);
-                return acc;
+            .reduce((accepted, span) => {
+                const last = accepted[accepted.length - 1];
+                if (seenRoles.has(span.role) || (last && span.start < last.end) || accepted.length >= 4) return accepted;
+                seenRoles.add(span.role);
+                accepted.push(span);
+                return accepted;
             }, []);
     }
 
     function normalizeRole(role) {
         const value = String(role || '').toLowerCase().trim();
         if (value === 'verb' || value === 'predicate verb') return 'predicate';
-        if (value === 'predicate') return 'predicate';
-        if (value === 'subject') return 'subject';
-        if (value === 'object') return 'object';
-        if (value === 'complement') return 'complement';
-        if (value === 'modifier' || value === 'adverbial' || value === 'attribute') return 'modifier';
-        if (value === 'connector' || value === 'conjunction') return 'connector';
         return value;
     }
 
@@ -1013,9 +1446,7 @@
         node.textContent = '';
         let cursor = 0;
         for (const span of spans) {
-            if (span.start > cursor) {
-                node.append(document.createTextNode(text.slice(cursor, span.start)));
-            }
+            if (span.start > cursor) node.append(document.createTextNode(text.slice(cursor, span.start)));
             const mark = document.createElement('span');
             mark.className = `rer-structure ${ROLE_CLASS[span.role]}`;
             mark.title = ROLE_LABEL[span.role] || span.role;
@@ -1023,9 +1454,45 @@
             node.append(mark);
             cursor = span.end;
         }
-        if (cursor < text.length) {
-            node.append(document.createTextNode(text.slice(cursor)));
-        }
+        if (cursor < text.length) node.append(document.createTextNode(text.slice(cursor)));
+    }
+
+    function renderSentenceDetail(item, result) {
+        const phraseHtml = result.phrases.length
+            ? result.phrases.map((phrase) => `
+                <span class="rer-phrase-row">
+                    <span class="rer-phrase-text">${escapeHtml(phrase.text)}</span>
+                    <span class="rer-phrase-meaning">${escapeHtml(phrase.meaning)}</span>
+                </span>
+            `).join('')
+            : '<span class="rer-help">无额外重点词组</span>';
+        const structureHtml = result.spans.length
+            ? result.spans.map((span) => `
+                <span class="rer-structure-row">
+                    <span class="rer-role-label" data-role="${escapeHtml(span.role)}">${escapeHtml(ROLE_LABEL[span.role] || span.role)}</span>
+                    <span>${escapeHtml(item.text.slice(span.start, span.end))}</span>
+                </span>
+            `).join('')
+            : '<span class="rer-help">未识别到明确主干</span>';
+        item.detailNode.innerHTML = `
+            <span class="rer-detail-section">
+                <span class="rer-detail-heading">译文</span>
+                <span class="rer-detail-content">${escapeHtml(result.translation)}</span>
+            </span>
+            <span class="rer-detail-section">
+                <span class="rer-detail-heading">重点词组</span>
+                <span class="rer-detail-content rer-phrase-list">${phraseHtml}</span>
+            </span>
+            <span class="rer-detail-section">
+                <span class="rer-detail-heading">句子主干</span>
+                <span class="rer-detail-content rer-structure-list">${structureHtml}</span>
+            </span>
+        `;
+    }
+
+    function setDetailMessage(item, message) {
+        if (item.ready) return;
+        item.detailNode.innerHTML = `<span class="rer-help">${escapeHtml(message)}</span>`;
     }
 
     async function requestChat(payload, options = {}) {
@@ -1051,6 +1518,7 @@
         if (!url) return Promise.reject(new Error('API 地址为空。'));
         const body = {
             model: config.model,
+            reasoning_effort: REASONING_EFFORT,
             messages: [
                 { role: 'system', content: system },
                 { role: 'user', content: user }
@@ -1136,66 +1604,6 @@
             }
             return null;
         }
-    }
-
-    function renderWordResult(data, fallbackWord) {
-        const word = data.word || fallbackWord;
-        const partOfSpeech = data.partOfSpeech || data.pos || '';
-        const meaning = data.meaning || data.meanings || '';
-        const inSentence = data.inSentence || data.sense || '';
-        const note = data.note || '';
-        const meaningHtml = Array.isArray(meaning)
-            ? `<ul class="rer-popover-list">${meaning.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-            : `<p>${escapeHtml(meaning)}</p>`;
-        return [
-            `<p><span class="rer-label">单词</span>${escapeHtml(word)}${partOfSpeech ? ` · ${escapeHtml(partOfSpeech)}` : ''}</p>`,
-            meaningHtml,
-            inSentence ? `<p><span class="rer-label">句中</span>${escapeHtml(inSentence)}</p>` : '',
-            note ? `<p><span class="rer-label">提示</span>${escapeHtml(note)}</p>` : ''
-        ].join('');
-    }
-
-    function renderTranslationResult(data) {
-        const translation = data.translation || data.text || '';
-        const note = data.note || data.explanation || '';
-        return [
-            translation ? `<p>${escapeHtml(translation)}</p>` : '',
-            note ? `<p><span class="rer-label">注</span>${escapeHtml(note)}</p>` : ''
-        ].join('') || '<p>没有得到翻译结果。</p>';
-    }
-
-    function showPopover(point, title, bodyHtml) {
-        hidePopover();
-        popoverRoot = document.createElement('section');
-        popoverRoot.className = 'rer-popover';
-        popoverRoot.setAttribute('role', 'dialog');
-        popoverRoot.innerHTML = `
-            <div class="rer-popover-header">
-                <div class="rer-popover-title">${escapeHtml(title)}</div>
-                <button type="button" class="rer-popover-close" aria-label="Close">×</button>
-            </div>
-            <div class="rer-popover-body">${bodyHtml}</div>
-        `;
-        popoverRoot.querySelector('.rer-popover-close').addEventListener('click', hidePopover);
-        document.documentElement.append(popoverRoot);
-        placePopover(popoverRoot, point);
-    }
-
-    function placePopover(node, point) {
-        const margin = 12;
-        const width = node.offsetWidth;
-        const height = node.offsetHeight;
-        let left = Number(point && point.x) || window.innerWidth / 2;
-        let top = Number(point && point.y) || window.innerHeight / 2;
-        left = Math.min(Math.max(margin, left), window.innerWidth - width - margin);
-        top = Math.min(Math.max(margin, top + 10), window.innerHeight - height - margin);
-        node.style.left = `${Math.round(left)}px`;
-        node.style.top = `${Math.round(top)}px`;
-    }
-
-    function hidePopover() {
-        if (popoverRoot) popoverRoot.remove();
-        popoverRoot = null;
     }
 
     function escapeHtml(value) {
