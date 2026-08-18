@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻提供逐句区分、单词释义、选句翻译和句子主干标亮，API 信息由使用者本地配置。
 // @description:en Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
@@ -26,12 +26,15 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.1';
-    const SCRIPT_RELEASED_AT = '2026-08-18 12:09:38 UTC+8';
+    const SCRIPT_VERSION = '0.1.2';
+    const SCRIPT_RELEASED_AT = '2026-08-18 13:30:44 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v1';
     const SENTENCE_PREFIX = 'rer-s';
     const MAX_ANALYSIS_SENTENCES = 80;
-    const ANALYSIS_BATCH_SIZE = 8;
+    const ANALYSIS_BATCH_SIZE = 3;
+    const REQUEST_TIMEOUT_MS = 120000;
+    const REQUEST_MAX_ATTEMPTS = 2;
+    const REQUEST_RETRY_DELAY_MS = 1000;
     const DEFAULT_MODEL = 'gpt-5.6-luna';
     const DEFAULT_CONFIG = {
         endpoint: '',
@@ -907,7 +910,7 @@
             for (let index = 0; index < pending.length; index += ANALYSIS_BATCH_SIZE) {
                 const batch = pending.slice(index, index + ANALYSIS_BATCH_SIZE);
                 setStatus(`正在分析句子结构 ${completed}/${pending.length}...`);
-                const results = await analyzeBatch(batch);
+                const results = await analyzeBatchWithFallback(batch);
                 for (const result of results) {
                     applyStructureResult(result);
                 }
@@ -919,6 +922,20 @@
         } finally {
             analyzeRunning = false;
             setAnalyzeButtonState(false);
+        }
+    }
+
+    async function analyzeBatchWithFallback(batch) {
+        try {
+            return await analyzeBatch(batch);
+        } catch (error) {
+            const canSplit = error.code === 'timeout' || error.code === 'invalid-structure';
+            if (batch.length === 1 || !canSplit) throw error;
+            const splitAt = Math.ceil(batch.length / 2);
+            setStatus(`结构分析响应较慢，正在拆分 ${batch.length} 句后重试...`);
+            const first = await analyzeBatchWithFallback(batch.slice(0, splitAt));
+            const second = await analyzeBatchWithFallback(batch.slice(splitAt));
+            return first.concat(second);
         }
     }
 
@@ -944,10 +961,10 @@
                 'The end offset is exclusive. Keep spans exact.',
                 JSON.stringify(payload)
             ].join('\n')
-        });
+        }, { splitOnTimeout: batch.length > 1 });
         const parsed = parseJsonMaybe(response);
         if (!Array.isArray(parsed)) {
-            throw new Error('模型没有返回可解析的结构 JSON。');
+            throw createRequestError('模型没有返回可解析的结构 JSON。', false, 'invalid-structure');
         }
         return parsed;
     }
@@ -1011,7 +1028,25 @@
         }
     }
 
-    function requestChat({ system, user }) {
+    async function requestChat(payload, options = {}) {
+        const maxAttempts = Number.isInteger(options.maxAttempts)
+            ? Math.max(1, options.maxAttempts)
+            : REQUEST_MAX_ATTEMPTS;
+        let lastError = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            try {
+                return await requestChatOnce(payload);
+            } catch (error) {
+                lastError = error;
+                const splitNow = options.splitOnTimeout && error.code === 'timeout';
+                if (!error.retryable || splitNow || attempt >= maxAttempts) throw error;
+                await delay(REQUEST_RETRY_DELAY_MS * attempt);
+            }
+        }
+        throw lastError || new Error('API 请求失败。');
+    }
+
+    function requestChatOnce({ system, user }) {
         const url = getChatCompletionsUrl();
         if (!url) return Promise.reject(new Error('API 地址为空。'));
         const body = {
@@ -1032,10 +1067,14 @@
                     Authorization: `Bearer ${config.apiKey}`
                 },
                 data: JSON.stringify(body),
-                timeout: 45000,
+                timeout: REQUEST_TIMEOUT_MS,
                 onload: (response) => {
                     if (response.status < 200 || response.status >= 300) {
-                        reject(new Error(`API 请求失败 HTTP ${response.status}: ${String(response.responseText || '').slice(0, 180)}`));
+                        reject(createRequestError(
+                            `API 请求失败 HTTP ${response.status}: ${String(response.responseText || '').slice(0, 180)}`,
+                            response.status === 408 || response.status === 429 || response.status >= 500,
+                            `http-${response.status}`
+                        ));
                         return;
                     }
                     try {
@@ -1050,10 +1089,21 @@
                         reject(new Error(`API 响应解析失败：${error.message || String(error)}`));
                     }
                 },
-                onerror: () => reject(new Error('API 网络请求失败。')),
-                ontimeout: () => reject(new Error('API 请求超时。'))
+                onerror: () => reject(createRequestError('API 网络请求失败。', true, 'network')),
+                ontimeout: () => reject(createRequestError(`API 请求超过 ${REQUEST_TIMEOUT_MS / 1000} 秒。`, true, 'timeout'))
             });
         });
+    }
+
+    function createRequestError(message, retryable, code) {
+        const error = new Error(message);
+        error.retryable = Boolean(retryable);
+        error.code = code || 'request';
+        return error;
+    }
+
+    function delay(milliseconds) {
+        return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
     }
 
     function parseJsonMaybe(value) {
