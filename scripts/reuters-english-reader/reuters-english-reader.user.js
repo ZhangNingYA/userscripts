@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.6.0
+// @version      0.7.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.6.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 16:48:52 UTC+8';
+    const SCRIPT_VERSION = '0.7.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 17:25:48 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
@@ -112,6 +112,7 @@
         }
 
         .rer-detail-toggle {
+            position: relative;
             display: inline-grid;
             box-sizing: border-box;
             place-items: center;
@@ -119,13 +120,12 @@
             height: 20px;
             margin: 0 0.16em;
             padding: 0;
-            border: 1px solid rgba(8, 121, 111, 0.2);
+            border: 0;
             border-radius: 4px;
-            background: #ffffff;
-            color: var(--rer-muted);
+            background: transparent;
+            color: #73808c;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(25, 38, 51, 0.1);
-            font: 750 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            box-shadow: none;
             letter-spacing: 0;
             text-decoration: none;
             touch-action: manipulation;
@@ -136,20 +136,55 @@
 
         .rer-detail-toggle:hover,
         .rer-detail-toggle:focus-visible {
-            border-color: rgba(8, 121, 111, 0.52);
-            background: #f0faf8;
+            background: rgba(8, 121, 111, 0.09);
             color: var(--rer-accent-strong);
-            outline: none;
             transform: translateY(-1px);
         }
 
+        .rer-detail-toggle:focus-visible {
+            outline: 2px solid rgba(8, 121, 111, 0.28);
+            outline-offset: 1px;
+        }
+
+        .rer-translation-icon {
+            display: block;
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+
         .rer-detail-toggle.rer-detail-ready {
-            border-color: rgba(8, 121, 111, 0.42);
-            background: #eff9f7;
             color: var(--rer-accent);
         }
 
+        .rer-detail-toggle.rer-detail-ready::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 5px;
+            height: 5px;
+            border: 1px solid #ffffff;
+            border-radius: 50%;
+            background: #16a36a;
+            box-shadow: 0 0 0 1px rgba(22, 163, 106, 0.14);
+        }
+
+        .rer-detail-toggle[aria-expanded="true"] {
+            background: #eaf7f4;
+            color: var(--rer-accent-strong);
+        }
+
         .rer-detail-toggle[data-rer-loading="true"] {
+            color: var(--rer-accent);
+        }
+
+        .rer-detail-toggle[data-rer-loading="true"] .rer-translation-icon {
             animation: rer-pulse 900ms ease-in-out infinite alternate;
         }
 
@@ -754,6 +789,7 @@
             </div>
             <div class="rer-toolbar-actions">
                 <button type="button" class="rer-button rer-button-primary" data-rer-action="continue">继续</button>
+                <button type="button" class="rer-button" data-rer-action="load-all" aria-label="加载全文" title="加载全文">全文</button>
                 <button type="button" class="rer-button" data-rer-action="settings">设置</button>
             </div>
         `;
@@ -771,6 +807,8 @@
             showSettings();
         } else if (action === 'continue') {
             analyzeSentences();
+        } else if (action === 'load-all') {
+            requestFullArticleAnalysis();
         }
     }
 
@@ -965,7 +1003,16 @@
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
                 toggleNode.setAttribute('aria-label', '查看本句精读');
                 toggleNode.title = '查看本句精读';
-                toggleNode.textContent = '译';
+                toggleNode.innerHTML = `
+                    <svg class="rer-translation-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="m5 8 6 6"></path>
+                        <path d="m4 14 6-6 2-3"></path>
+                        <path d="M2 5h12"></path>
+                        <path d="M7 2h1"></path>
+                        <path d="m22 22-5-10-5 10"></path>
+                        <path d="M14 18h6"></path>
+                    </svg>
+                `;
                 const detailNode = document.createElement('span');
                 detailNode.className = 'rer-detail-panel';
                 detailNode.dataset.rerSentenceDetail = id;
@@ -1224,8 +1271,6 @@
             if (action === 'load-one') {
                 setDetailExpanded(item, true);
                 analyzeSentences({ items: [item] });
-            } else if (action === 'load-all') {
-                requestFullArticleAnalysis();
             }
         });
         document.addEventListener('keydown', (event) => {
@@ -1720,7 +1765,6 @@
                 <span class="rer-detail-empty-copy">${escapeHtml(message)}</span>
                 <span class="rer-detail-actions">
                     <button type="button" class="rer-button rer-button-primary" data-rer-sentence-action="load-one" data-rer-sentence-id="${escapeHtml(item.id)}">精读本句</button>
-                    <button type="button" class="rer-button" data-rer-sentence-action="load-all" data-rer-sentence-id="${escapeHtml(item.id)}">加载全文</button>
                 </span>
             </span>
         `;
