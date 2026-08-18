@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.2.0
+// @version      0.2.1
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,11 +26,11 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.2.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 13:47:02 UTC+8';
+    const SCRIPT_VERSION = '0.2.1';
+    const SCRIPT_RELEASED_AT = '2026-08-18 14:09:02 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
-    const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v1';
+    const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
     const SENTENCE_PREFIX = 'rer-s';
     const MAX_ANALYSIS_SENTENCES = 80;
     const ANALYSIS_BATCH_SIZE = 3;
@@ -48,7 +48,7 @@
         enabled: true,
         autoAnalyze: true,
         defaultExpanded: false,
-        showToolbar: true,
+        toolbarCollapsed: true,
         targetLanguage: 'Simplified Chinese'
     };
     const ROLE_CLASS = {
@@ -246,11 +246,14 @@
             color: var(--rer-muted);
             font-size: 11px;
             font-weight: 750;
+            white-space: nowrap;
         }
 
         .rer-detail-content {
             min-width: 0;
-            overflow-wrap: anywhere;
+            overflow-wrap: break-word;
+            word-break: normal;
+            writing-mode: horizontal-tb;
         }
 
         .rer-phrase-list,
@@ -262,9 +265,16 @@
         .rer-phrase-row,
         .rer-structure-row {
             display: grid;
-            grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
             gap: 8px;
             align-items: baseline;
+        }
+
+        .rer-phrase-row {
+            grid-template-columns: minmax(0, 0.9fr) minmax(120px, 1.1fr);
+        }
+
+        .rer-structure-row {
+            grid-template-columns: 74px minmax(0, 1fr);
         }
 
         .rer-phrase-text {
@@ -273,7 +283,32 @@
         }
 
         .rer-phrase-meaning {
+            min-width: 0;
             color: var(--rer-muted);
+            overflow-wrap: break-word;
+            word-break: normal;
+            writing-mode: horizontal-tb;
+        }
+
+        .rer-pattern-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 5px;
+        }
+
+        .rer-pattern {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 0 7px;
+            border: 1px solid rgba(8, 121, 111, 0.24);
+            border-radius: 5px;
+            background: rgba(8, 121, 111, 0.07);
+            color: var(--rer-accent-strong);
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
         .rer-role-label {
@@ -747,9 +782,17 @@
                 gap: 3px;
             }
 
-            .rer-phrase-row,
+            .rer-phrase-row {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 2px;
+            }
+
             .rer-structure-row {
-                grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+                grid-template-columns: 64px minmax(0, 1fr);
+            }
+
+            .rer-settings-footer {
+                flex-wrap: wrap;
             }
         }
     `;
@@ -759,7 +802,7 @@
         registerMenu();
         if (!config.enabled) return;
         document.documentElement.classList.add('rer-reading-active');
-        if (config.showToolbar) buildToolbar();
+        buildToolbar();
         installInteractionHandlers();
         enhanceArticle();
         observePageChanges();
@@ -826,18 +869,18 @@
     }
 
     function buildToolbar() {
-        if (toolbarRoot || !config.showToolbar) return;
+        if (toolbarRoot) return;
         toolbarRoot = document.createElement('section');
-        toolbarRoot.className = 'rer-toolbar rer-toolbar-collapsed';
+        toolbarRoot.className = `rer-toolbar${config.toolbarCollapsed ? ' rer-toolbar-collapsed' : ''}`;
         toolbarRoot.setAttribute('aria-label', 'Reuters English Reader');
         toolbarRoot.innerHTML = `
-            <button type="button" class="rer-toolbar-toggle" data-rer-action="toggle" aria-expanded="false">
+            <button type="button" class="rer-toolbar-toggle" data-rer-action="toggle" aria-expanded="${String(!config.toolbarCollapsed)}">
                 <span class="rer-toolbar-mark" aria-hidden="true">R</span>
                 <span class="rer-toolbar-title">Reuters 精读 <span class="rer-version">v${escapeHtml(SCRIPT_VERSION)}</span></span>
                 <span class="rer-progress-count" data-rer-progress>0/0</span>
                 <span class="rer-toolbar-chevron" aria-hidden="true"></span>
             </button>
-            <div class="rer-toolbar-body" data-rer-toolbar-body hidden>
+            <div class="rer-toolbar-body" data-rer-toolbar-body${config.toolbarCollapsed ? ' hidden' : ''}>
                 <div class="rer-status" data-rer-status>准备正文</div>
                 <div class="rer-progress-track"><span class="rer-progress-bar" data-rer-progress-bar></span></div>
                 <div class="rer-toolbar-actions">
@@ -849,7 +892,7 @@
                     <div class="rer-legend" aria-label="Structure legend">
                         <span>主语</span><span>谓语</span><span>宾语</span><span>补语</span>
                     </div>
-                    <button type="button" class="rer-link-button" data-rer-action="hide">隐藏</button>
+                    <button type="button" class="rer-link-button" data-rer-action="collapse">收起</button>
                 </div>
             </div>
         `;
@@ -866,27 +909,23 @@
         if (!button) return;
         const action = button.getAttribute('data-rer-action');
         if (action === 'toggle') {
-            const collapsed = toolbarRoot.classList.toggle('rer-toolbar-collapsed');
-            button.setAttribute('aria-expanded', String(!collapsed));
-            toolbarRoot.querySelector('[data-rer-toolbar-body]').hidden = collapsed;
+            setToolbarCollapsed(!toolbarRoot.classList.contains('rer-toolbar-collapsed'));
         } else if (action === 'settings') {
             showSettings();
         } else if (action === 'analyze') {
             analyzeSentences();
         } else if (action === 'expand') {
             toggleAllDetails(button);
-        } else if (action === 'hide') {
-            saveConfig({ ...config, showToolbar: false });
-            removeToolbar();
+        } else if (action === 'collapse') {
+            setToolbarCollapsed(true);
         }
     }
 
-    function removeToolbar() {
-        if (toolbarRoot) toolbarRoot.remove();
-        toolbarRoot = null;
-        statusNode = null;
-        progressNode = null;
-        progressBarNode = null;
+    function setToolbarCollapsed(collapsed) {
+        if (!toolbarRoot) return;
+        toolbarRoot.classList.toggle('rer-toolbar-collapsed', collapsed);
+        toolbarRoot.querySelector('[data-rer-action="toggle"]').setAttribute('aria-expanded', String(!collapsed));
+        toolbarRoot.querySelector('[data-rer-toolbar-body]').hidden = collapsed;
     }
 
     function setStatus(message) {
@@ -919,9 +958,9 @@
     function registerMenu() {
         if (typeof GM_registerMenuCommand !== 'function') return;
         GM_registerMenuCommand('Reuters Reader: 设置', showSettings);
-        GM_registerMenuCommand('Reuters Reader: 显示工具条', () => {
-            saveConfig({ ...config, showToolbar: true });
+        GM_registerMenuCommand('Reuters Reader: 展开工具条', () => {
             buildToolbar();
+            setToolbarCollapsed(false);
             updateStatusFromState();
         });
         GM_registerMenuCommand('Reuters Reader: 加载缺失精读', () => analyzeSentences());
@@ -963,7 +1002,7 @@
                     ${renderSettingSwitch('rer-enabled', '启用精读', '刷新页面后完整生效')}
                     ${renderSettingSwitch('rer-auto', '自动加载', '首次打开文章时准备全部句子')}
                     ${renderSettingSwitch('rer-expanded', '默认展开', '加载完成后直接显示句子精读')}
-                    ${renderSettingSwitch('rer-toolbar-visible', '显示工具条', '可从 userscript 菜单重新显示')}
+                    ${renderSettingSwitch('rer-toolbar-collapsed', '默认收起工具条', '打开文章时仅显示右上角精读按钮')}
                 </div>
             </div>
             <div class="rer-settings-footer">
@@ -987,7 +1026,7 @@
         panel.querySelector('#rer-enabled').checked = Boolean(config.enabled);
         panel.querySelector('#rer-auto').checked = Boolean(config.autoAnalyze);
         panel.querySelector('#rer-expanded').checked = Boolean(config.defaultExpanded);
-        panel.querySelector('#rer-toolbar-visible').checked = Boolean(config.showToolbar);
+        panel.querySelector('#rer-toolbar-collapsed').checked = Boolean(config.toolbarCollapsed);
 
         backdrop.addEventListener('click', closeSettings);
         panel.addEventListener('click', (event) => {
@@ -1004,17 +1043,14 @@
                 enabled: panel.querySelector('#rer-enabled').checked,
                 autoAnalyze: panel.querySelector('#rer-auto').checked,
                 defaultExpanded: panel.querySelector('#rer-expanded').checked,
-                showToolbar: panel.querySelector('#rer-toolbar-visible').checked,
+                toolbarCollapsed: panel.querySelector('#rer-toolbar-collapsed').checked,
                 targetLanguage: DEFAULT_CONFIG.targetLanguage
             };
             saveConfig(nextConfig);
             closeSettings();
-            if (!config.showToolbar) {
-                removeToolbar();
-            } else {
-                buildToolbar();
-                updateStatusFromState();
-            }
+            buildToolbar();
+            setToolbarCollapsed(config.toolbarCollapsed);
+            updateStatusFromState();
             if (config.enabled && config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         });
         endpointInput.focus();
@@ -1240,7 +1276,7 @@
     }
 
     function getSentenceCacheKey(text) {
-        const value = `v1\n${config.model}\n${config.targetLanguage}\n${text}`;
+        const value = `v2\n${config.model}\n${config.targetLanguage}\n${text}`;
         let hash = 2166136261;
         for (let index = 0; index < value.length; index += 1) {
             hash ^= value.charCodeAt(index);
@@ -1254,6 +1290,7 @@
             text: item.text,
             translation: result.translation,
             phrases: result.phrases,
+            pattern: result.pattern,
             spans: result.spans,
             savedAt: Date.now()
         };
@@ -1336,12 +1373,18 @@
         }
     }
 
-    async function analyzeBatchWithFallback(batch) {
+    async function analyzeBatchWithFallback(batch, retryInvalid = true) {
         try {
             return await analyzeBatch(batch);
         } catch (error) {
             const canSplit = error.code === 'timeout' || error.code === 'invalid-analysis';
-            if (batch.length === 1 || !canSplit) throw error;
+            if (batch.length === 1) {
+                if (error.code === 'invalid-analysis' && retryInvalid) {
+                    return analyzeBatchWithFallback(batch, false);
+                }
+                throw error;
+            }
+            if (!canSplit) throw error;
             const splitAt = Math.ceil(batch.length / 2);
             const first = await analyzeBatchWithFallback(batch.slice(0, splitAt));
             const second = await analyzeBatchWithFallback(batch.slice(splitAt));
@@ -1361,24 +1404,45 @@
             system: [
                 'You create concise Chinese reading notes for Reuters English sentences.',
                 'Return JSON only, without markdown.',
-                'For each sentence return id, translation, phrases, and spans.',
+                'For each sentence return id, translation, phrases, pattern, and spans.',
                 'phrases contains 1 to 3 difficult or important phrases as {text, meaning}.',
+                'pattern must be exactly one of SV, SVO, SVC, or SVOC.',
                 'spans uses exact zero-based character offsets and only roles subject, predicate, object, complement.',
                 'Mark only the shortest main-clause core: at most one span per role and at most four spans total.',
+                'For an active transitive main verb, always include its direct object and use SVO or SVOC.',
+                'For a linking verb, include its subject complement and use SVC.',
+                'For an intransitive or passive clause with no grammatical object, use SV and do not invent an object.',
+                'Include auxiliaries in the shortest complete predicate.',
                 'Never mark modifiers, connectors, or the whole sentence.'
             ].join(' '),
             user: [
                 'Translate each sentence into natural Simplified Chinese, explain its key phrases, and identify only its core clause structure.',
-                'Return an array like [{"id":"rer-s-1","translation":"...","phrases":[{"text":"...","meaning":"..."}],"spans":[{"start":0,"end":7,"role":"subject"}]}].',
+                'Return an array like [{"id":"rer-s-1","translation":"...","phrases":[{"text":"...","meaning":"..."}],"pattern":"SVO","spans":[{"text":"Reuters","start":0,"end":7,"role":"subject"}]}].',
                 'Keep names, numbers, organizations, and dates accurate. Offsets must match the original text exactly.',
                 JSON.stringify(payload)
             ].join('\n')
         }, { splitOnTimeout: batch.length > 1 });
         const parsed = parseJsonMaybe(response);
-        if (!Array.isArray(parsed)) {
+        const sourceById = new Map(batch.map((item) => [item.id, item]));
+        if (!Array.isArray(parsed)
+            || parsed.length < batch.length
+            || !parsed.every((result) => isAnalysisResultValid(result, sourceById.get(result && result.id)))) {
             throw createRequestError('模型没有返回可解析的精读 JSON。', false, 'invalid-analysis');
         }
         return parsed;
+    }
+
+    function isAnalysisResultValid(result, item) {
+        if (!result || !item || !normalizeReadingText(result.translation || result.text || '')) return false;
+        const spans = sanitizeSpans(result.spans, item.text);
+        const derivedPattern = deriveStructurePattern(spans);
+        const statedPattern = normalizeStructurePattern(result.pattern);
+        return derivedPattern !== '未完整识别' && statedPattern === derivedPattern;
+    }
+
+    function normalizeStructurePattern(value) {
+        const pattern = String(value || '').toUpperCase().replace(/[^A-Z]/g, '');
+        return ['SV', 'SVO', 'SVC', 'SVOC'].includes(pattern) ? pattern : '';
     }
 
     function applyAnalysisResult(result, persist) {
@@ -1389,7 +1453,8 @@
         if (!translation) return;
         const phrases = sanitizePhrases(result.phrases);
         const spans = sanitizeSpans(result.spans, item.text);
-        const normalized = { translation, phrases, spans };
+        const pattern = deriveStructurePattern(spans);
+        const normalized = { translation, phrases, pattern, spans };
         renderSentenceWithSpans(item.node, item.text, spans);
         renderSentenceDetail(item, normalized);
         item.ready = true;
@@ -1415,11 +1480,7 @@
         if (!Array.isArray(spans)) return [];
         const seenRoles = new Set();
         return spans
-            .map((span) => ({
-                start: Number(span.start),
-                end: Number(span.end),
-                role: normalizeRole(span.role)
-            }))
+            .map((span) => normalizeSpan(span, text))
             .filter((span) => Number.isInteger(span.start)
                 && Number.isInteger(span.end)
                 && span.start >= 0
@@ -1434,6 +1495,31 @@
                 accepted.push(span);
                 return accepted;
             }, []);
+    }
+
+    function normalizeSpan(span, text) {
+        const role = normalizeRole(span && span.role);
+        const exactText = String(span && span.text || '').trim();
+        let start = Number(span && span.start);
+        let end = Number(span && span.end);
+        const offsetsValid = Number.isInteger(start)
+            && Number.isInteger(end)
+            && start >= 0
+            && end > start
+            && end <= text.length;
+        if (exactText && (!offsetsValid || text.slice(start, end) !== exactText)) {
+            start = text.indexOf(exactText);
+            end = start >= 0 ? start + exactText.length : -1;
+        }
+        return { start, end, role };
+    }
+
+    function deriveStructurePattern(spans) {
+        const roles = new Set(spans.map((span) => span.role));
+        if (roles.has('object') && roles.has('complement')) return 'SVOC';
+        if (roles.has('object')) return 'SVO';
+        if (roles.has('complement')) return 'SVC';
+        return roles.has('subject') && roles.has('predicate') ? 'SV' : '未完整识别';
     }
 
     function normalizeRole(role) {
@@ -1485,7 +1571,10 @@
             </span>
             <span class="rer-detail-section">
                 <span class="rer-detail-heading">句子主干</span>
-                <span class="rer-detail-content rer-structure-list">${structureHtml}</span>
+                <span class="rer-detail-content rer-structure-list">
+                    <span class="rer-pattern-row"><span class="rer-role-label">句型</span><span class="rer-pattern">${escapeHtml(result.pattern)}</span></span>
+                    ${structureHtml}
+                </span>
             </span>
         `;
     }
