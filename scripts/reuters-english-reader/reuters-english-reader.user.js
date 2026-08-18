@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻提供逐句区分、单词释义、选句翻译和句子主干标亮，API 信息由使用者本地配置。
 // @description:en Sentence-by-sentence Reuters reading with word definitions, selected-text translation, and grammar structure highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.0';
-    const SCRIPT_RELEASED_AT = '2026-08-17 21:31:29 UTC+8';
+    const SCRIPT_VERSION = '0.1.1';
+    const SCRIPT_RELEASED_AT = '2026-08-18 12:09:38 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v1';
     const SENTENCE_PREFIX = 'rer-s';
     const MAX_ANALYSIS_SENTENCES = 80;
@@ -166,10 +166,10 @@
 
         .rer-toolbar {
             position: fixed;
+            top: 72px;
             right: 18px;
-            bottom: 18px;
-            width: min(344px, calc(100vw - 24px));
-            padding: 10px;
+            width: min(326px, calc(100vw - 24px));
+            padding: 9px;
             border: 1px solid rgba(31, 41, 51, 0.16);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.95);
@@ -203,7 +203,7 @@
         .rer-status {
             margin-top: 7px;
             color: var(--rer-muted);
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.35;
         }
 
@@ -330,10 +330,10 @@
 
         .rer-settings {
             position: fixed;
+            top: 72px;
             right: 16px;
-            bottom: 16px;
             width: min(430px, calc(100vw - 32px));
-            max-height: min(650px, calc(100vh - 32px));
+            max-height: calc(100vh - 92px);
             overflow: auto;
             padding: 16px;
             border: 1px solid rgba(31, 41, 51, 0.18);
@@ -403,26 +403,39 @@
         .rer-legend {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 7px 9px;
             margin-top: 7px;
         }
 
         .rer-legend span {
             display: inline-flex;
             align-items: center;
-            min-height: 22px;
-            padding: 0 7px;
-            border-radius: 999px;
-            background: rgba(31, 41, 51, 0.06);
+            gap: 4px;
+            min-height: 16px;
             color: var(--rer-muted);
             font-size: 11px;
             white-space: nowrap;
         }
 
+        .rer-legend span::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(31, 41, 51, 0.38);
+        }
+
+        .rer-legend span:nth-child(1)::before { background: #1677ff; }
+        .rer-legend span:nth-child(2)::before { background: #d64458; }
+        .rer-legend span:nth-child(3)::before { background: #15803d; }
+        .rer-legend span:nth-child(4)::before { background: #7e57c2; }
+        .rer-legend span:nth-child(5)::before { background: #c77d00; }
+        .rer-legend span:nth-child(6)::before { background: #0c7c9c; }
+
         @media (max-width: 560px) {
             .rer-toolbar {
                 right: 12px;
-                bottom: 12px;
+                top: 62px;
                 width: calc(100vw - 24px);
             }
 
@@ -440,9 +453,9 @@
 
             .rer-settings {
                 right: 10px;
-                bottom: 10px;
+                top: 62px;
                 width: calc(100vw - 20px);
-                max-height: calc(100vh - 20px);
+                max-height: calc(100vh - 72px);
             }
         }
     `;
