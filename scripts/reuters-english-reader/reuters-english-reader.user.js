@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.4.0
+// @version      0.5.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.4.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 15:33:58 UTC+8';
+    const SCRIPT_VERSION = '0.5.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 16:20:43 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
@@ -89,99 +89,33 @@
             --rer-shadow: 0 16px 42px rgba(25, 38, 51, 0.2);
         }
 
-        html.rer-reading-active [data-rer-reading-element="true"] {
-            line-height: 1.72 !important;
+        ::highlight(rer-role-subject) {
+            background-color: rgba(22, 119, 255, 0.12);
+            text-decoration: underline 2px #1677ff;
         }
 
-        .rer-reading-title .rer-sentence-block {
-            margin: 0.24em 0 0.42em;
+        ::highlight(rer-role-predicate) {
+            background-color: rgba(205, 55, 75, 0.12);
+            text-decoration: underline 2px #cd374b;
         }
 
-        .rer-reading-title .rer-sentence {
-            padding: 0.28em 0.4em 0.32em;
-            line-height: 1.28;
+        ::highlight(rer-role-object) {
+            background-color: rgba(21, 128, 61, 0.12);
+            text-decoration: underline 2px #15803d;
         }
 
-        .rer-reading-title .rer-detail-panel {
-            font-weight: 400;
-        }
-
-        .rer-linked-title {
-            margin: 0.42em 0 0.62em;
-        }
-
-        .rer-linked-title > a {
-            display: block;
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .rer-sentence-block {
-            display: block;
-            box-sizing: border-box;
-            margin: 0.62em 0 0.78em;
-            color: inherit;
-        }
-
-        .rer-sentence {
-            display: block;
-            box-sizing: border-box;
-            padding: 0.48em 0.62em 0.52em;
-            border-left: 3px solid rgba(8, 121, 111, 0.5);
-            border-bottom: 1px solid var(--rer-line);
-            border-radius: 6px 6px 3px 3px;
-            background: rgba(249, 251, 250, 0.92);
-            color: inherit;
-            letter-spacing: 0 !important;
-            transition: border-color 140ms ease, background-color 140ms ease;
-        }
-
-        .rer-sentence-block:nth-child(2n) .rer-sentence {
-            border-left-color: rgba(164, 75, 39, 0.48);
-            background: rgba(252, 250, 247, 0.9);
-        }
-
-        .rer-sentence.rer-analyzed {
-            border-left-color: rgba(8, 121, 111, 0.9);
-        }
-
-        .rer-structure {
-            border-radius: 3px;
-            padding: 0.01em 0.04em 0.03em;
-            text-decoration-line: underline;
-            text-decoration-thickness: 2px;
-            text-underline-offset: 0.2em;
-            box-decoration-break: clone;
-            -webkit-box-decoration-break: clone;
-        }
-
-        .rer-role-subject {
-            background: rgba(22, 119, 255, 0.1);
-            text-decoration-color: #1677ff;
-        }
-
-        .rer-role-predicate {
-            background: rgba(205, 55, 75, 0.1);
-            text-decoration-color: #cd374b;
-        }
-
-        .rer-role-object {
-            background: rgba(21, 128, 61, 0.1);
-            text-decoration-color: #15803d;
-        }
-
-        .rer-role-complement {
-            background: rgba(116, 76, 184, 0.1);
-            text-decoration-color: #744cb8;
+        ::highlight(rer-role-complement) {
+            background-color: rgba(116, 76, 184, 0.12);
+            text-decoration: underline 2px #744cb8;
         }
 
         .rer-detail-toggle {
-            display: grid;
+            display: inline-grid;
             box-sizing: border-box;
             place-items: center;
-            width: 36px;
-            height: 36px;
-            margin: 5px 8px 5px auto;
+            width: 26px;
+            height: 26px;
+            margin: 0 0.24em;
             padding: 0;
             border: 1px solid rgba(8, 121, 111, 0.2);
             border-radius: 50%;
@@ -192,6 +126,7 @@
             font: 600 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             letter-spacing: 0;
             touch-action: manipulation;
+            vertical-align: 0.08em;
             transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
         }
 
@@ -998,30 +933,20 @@
         let changed = 0;
         for (const { element, isHeadline, isLinkedTitle } of readingElements) {
             if (element.dataset.rerReadingElement === 'true') continue;
-            const text = normalizeReadingText(element.textContent);
+            const textMap = buildTextMap(element);
+            const text = textMap.text;
             const isTitle = isHeadline || isLinkedTitle;
             if (!shouldProcessReadingElement(text, element, isTitle)) continue;
-            const parts = isTitle ? [text] : segmentSentences(text);
+            const parts = isTitle
+                ? [{ text, start: 0, end: text.length }]
+                : segmentSentenceRanges(text);
             if (!parts.length) continue;
-            const linkedParent = isLinkedTitle ? element.parentNode : null;
-            element.textContent = '';
             element.dataset.rerReadingElement = 'true';
-            if (isHeadline) {
-                element.classList.add('rer-reading-title');
-            } else if (!isLinkedTitle) {
-                element.dataset.rerParagraph = 'true';
-            }
-            for (const sentenceText of parts) {
+            const prepared = parts.map((part) => {
                 const id = `${SENTENCE_PREFIX}-${++sentenceCounter}`;
-                const block = document.createElement('span');
-                block.className = `rer-sentence-block${isLinkedTitle ? ' rer-linked-title' : ''}`;
-                const sentenceNode = document.createElement('span');
-                sentenceNode.className = 'rer-sentence';
-                sentenceNode.dataset.rerSentenceId = id;
-                sentenceNode.textContent = sentenceText;
                 const toggleNode = document.createElement('button');
                 toggleNode.type = 'button';
-                toggleNode.className = 'rer-detail-toggle';
+                toggleNode.className = 'rer-detail-toggle rer-inline-control';
                 toggleNode.dataset.rerSentenceToggle = id;
                 toggleNode.dataset.rerLoading = 'false';
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
@@ -1036,34 +961,102 @@
                 detailNode.dataset.rerSentenceDetail = id;
                 detailNode.hidden = !config.defaultExpanded;
                 detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
-                if (isLinkedTitle && linkedParent) {
-                    linkedParent.insertBefore(block, element);
-                    element.append(sentenceNode);
-                    block.append(element, toggleNode, detailNode);
-                } else {
-                    block.append(sentenceNode, toggleNode, detailNode);
-                    element.append(block);
-                }
-                const item = {
+                return {
                     id,
-                    text: sentenceText,
+                    text: part.text,
+                    start: part.start,
+                    end: part.end,
                     order: sentenceCounter,
-                    node: sentenceNode,
+                    element,
                     toggleNode,
                     detailNode,
                     analysis: null,
                     ready: false,
                     loading: false
                 };
-                sentences.set(id, item);
+            });
+            for (const item of prepared.slice().reverse()) {
+                insertSentenceControls(item, textMap, isLinkedTitle);
+            }
+            for (const item of prepared) {
+                sentences.set(item.id, item);
                 restoreCachedAnalysis(item);
             }
             changed += 1;
         }
         if (changed > 0) {
             updateLoadedCount();
+            updateStructureHighlights();
             if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         }
+    }
+
+    function buildTextMap(element) {
+        const positions = [];
+        let text = '';
+        let pendingSpace = null;
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!node.data || !parent) return NodeFilter.FILTER_REJECT;
+                if (parent.closest('.rer-inline-control, .rer-detail-panel, script, style, noscript')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        let node = walker.nextNode();
+        while (node) {
+            for (let offset = 0; offset < node.data.length; offset += 1) {
+                const character = node.data[offset];
+                if (/\s/.test(character)) {
+                    if (text && !pendingSpace) pendingSpace = { node, start: offset, end: offset + 1 };
+                    continue;
+                }
+                if (pendingSpace && !/[,.;:!?]/.test(character)) {
+                    text += ' ';
+                    positions.push(pendingSpace);
+                }
+                pendingSpace = null;
+                text += character;
+                positions.push({ node, start: offset, end: offset + 1 });
+            }
+            node = walker.nextNode();
+        }
+        return { text, positions };
+    }
+
+    function segmentSentenceRanges(text) {
+        const ranges = [];
+        let cursor = 0;
+        for (const sentenceText of segmentSentences(text)) {
+            const start = text.indexOf(sentenceText, cursor);
+            if (start < 0) continue;
+            const end = start + sentenceText.length;
+            ranges.push({ text: sentenceText, start, end });
+            cursor = end;
+        }
+        return ranges;
+    }
+
+    function insertSentenceControls(item, textMap, isLinkedTitle) {
+        if (isLinkedTitle) {
+            item.element.after(item.toggleNode, item.detailNode);
+            return;
+        }
+        const point = textMap.positions[item.end - 1];
+        if (!point || !point.node.isConnected) return;
+        const endingLink = point.node.parentElement && point.node.parentElement.closest('a');
+        if (endingLink && item.element.contains(endingLink)) {
+            endingLink.after(item.toggleNode, item.detailNode);
+            return;
+        }
+        const range = document.createRange();
+        range.setStart(point.node, point.end);
+        range.collapse(true);
+        const fragment = document.createDocumentFragment();
+        fragment.append(item.toggleNode, item.detailNode);
+        range.insertNode(fragment);
     }
 
     function findArticleRoot() {
@@ -1172,10 +1165,10 @@
 
     function getConnectedReadingItems() {
         return Array.from(sentences.values())
-            .filter((item) => item.node.isConnected)
+            .filter((item) => item.toggleNode.isConnected && item.element.isConnected)
             .sort((left, right) => {
-                if (left.node === right.node) return 0;
-                const position = left.node.compareDocumentPosition(right.node);
+                if (left.toggleNode === right.toggleNode) return 0;
+                const position = left.toggleNode.compareDocumentPosition(right.toggleNode);
                 if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
                 if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
                 return left.order - right.order;
@@ -1227,10 +1220,42 @@
     function setDetailExpanded(item, expanded) {
         item.toggleNode.setAttribute('aria-expanded', String(expanded));
         item.detailNode.hidden = !expanded;
-        if (item.ready && item.analysis) {
-            renderSentenceWithSpans(item.node, item.text, expanded ? item.analysis.spans : []);
-        }
         updateDetailToggleLabel(item);
+        updateStructureHighlights();
+    }
+
+    function updateStructureHighlights() {
+        if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight !== 'function') return;
+        const rangesByRole = Object.fromEntries(Object.keys(ROLE_CLASS).map((role) => [role, []]));
+        const mapByElement = new Map();
+        for (const item of getConnectedReadingItems()) {
+            if (!item.ready
+                || !item.analysis
+                || item.toggleNode.getAttribute('aria-expanded') !== 'true') continue;
+            let textMap = mapByElement.get(item.element);
+            if (!textMap) {
+                textMap = buildTextMap(item.element);
+                mapByElement.set(item.element, textMap);
+            }
+            if (textMap.text.slice(item.start, item.end) !== item.text) continue;
+            for (const span of item.analysis.spans) {
+                const start = textMap.positions[item.start + span.start];
+                const end = textMap.positions[item.start + span.end - 1];
+                if (!start || !end || !start.node.isConnected || !end.node.isConnected) continue;
+                try {
+                    const range = document.createRange();
+                    range.setStart(start.node, start.start);
+                    range.setEnd(end.node, end.end);
+                    rangesByRole[span.role].push(range);
+                } catch (error) {
+                    console.warn('[Reuters English Reader] Failed to map structure highlight', error);
+                }
+            }
+        }
+        for (const [role, name] of Object.entries(ROLE_CLASS)) {
+            CSS.highlights.delete(name);
+            if (rangesByRole[role].length) CSS.highlights.set(name, new Highlight(...rangesByRole[role]));
+        }
     }
 
     function updateDetailToggleLabel(item) {
@@ -1306,12 +1331,13 @@
             item.ready = false;
             item.loading = false;
             item.analysis = null;
-            renderSentenceWithSpans(item.node, item.text, []);
-            item.node.classList.remove('rer-analyzed');
             item.toggleNode.classList.remove('rer-detail-ready');
             item.detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
-            setDetailExpanded(item, false);
+            item.toggleNode.setAttribute('aria-expanded', 'false');
+            item.detailNode.hidden = true;
+            updateDetailToggleLabel(item);
         }
+        updateStructureHighlights();
         updateLoadedCount();
     }
 
@@ -1463,8 +1489,8 @@
         if (!result || typeof result !== 'object') return false;
         const item = sentences.get(result.id);
         if (!item
-            || !item.node
-            || !item.node.isConnected
+            || !item.element
+            || !item.element.isConnected
             || !item.toggleNode.isConnected
             || !item.detailNode.isConnected) return false;
         const translation = normalizeReadingText(result.translation || result.text || '');
@@ -1474,20 +1500,18 @@
         const pattern = deriveStructurePattern(spans);
         const normalized = { translation, phrases, pattern, spans };
         try {
-            const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
-            renderSentenceWithSpans(item.node, item.text, expanded ? spans : []);
             renderSentenceDetail(item, normalized);
         } catch (error) {
             console.warn('[Reuters English Reader] Failed to render sentence analysis', error);
             return false;
         }
-        if (item.node.textContent !== item.text || !item.detailNode.textContent.includes(translation)) return false;
+        if (!item.detailNode.textContent.includes(translation)) return false;
         item.ready = true;
         item.loading = false;
         item.analysis = normalized;
-        item.node.classList.add('rer-analyzed');
         item.toggleNode.classList.add('rer-detail-ready');
         updateDetailToggleLabel(item);
+        updateStructureHighlights();
         if (persist) cacheAnalysis(item, normalized);
         return true;
     }
@@ -1553,21 +1577,6 @@
         const value = String(role || '').toLowerCase().trim();
         if (value === 'verb' || value === 'predicate verb') return 'predicate';
         return value;
-    }
-
-    function renderSentenceWithSpans(node, text, spans) {
-        node.textContent = '';
-        let cursor = 0;
-        for (const span of spans) {
-            if (span.start > cursor) node.append(document.createTextNode(text.slice(cursor, span.start)));
-            const mark = document.createElement('span');
-            mark.className = `rer-structure ${ROLE_CLASS[span.role]}`;
-            mark.title = ROLE_LABEL[span.role] || span.role;
-            mark.textContent = text.slice(span.start, span.end);
-            node.append(mark);
-            cursor = span.end;
-        }
-        if (cursor < text.length) node.append(document.createTextNode(text.slice(cursor)));
     }
 
     function renderSentenceDetail(item, result) {
