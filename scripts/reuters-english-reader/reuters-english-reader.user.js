@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.3.1
+// @version      0.4.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.3.1';
-    const SCRIPT_RELEASED_AT = '2026-08-18 15:04:47 UTC+8';
+    const SCRIPT_VERSION = '0.4.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 15:33:58 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
@@ -106,6 +106,16 @@
             font-weight: 400;
         }
 
+        .rer-linked-title {
+            margin: 0.42em 0 0.62em;
+        }
+
+        .rer-linked-title > a {
+            display: block;
+            color: inherit;
+            text-decoration: none;
+        }
+
         .rer-sentence-block {
             display: block;
             box-sizing: border-box;
@@ -166,59 +176,69 @@
         }
 
         .rer-detail-toggle {
-            display: flex;
+            display: grid;
             box-sizing: border-box;
-            align-items: center;
-            width: 100%;
-            min-height: 32px;
-            gap: 9px;
-            margin: 0;
-            padding: 0 0.4em 0 0.62em;
-            border: 0;
-            border-radius: 0 0 6px 6px;
-            background: transparent;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            margin: 5px 8px 5px auto;
+            padding: 0;
+            border: 1px solid rgba(8, 121, 111, 0.2);
+            border-radius: 50%;
+            background: #ffffff;
             color: var(--rer-muted);
             cursor: pointer;
-            font: 600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            box-shadow: 0 3px 10px rgba(25, 38, 51, 0.1);
+            font: 600 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             letter-spacing: 0;
-            text-align: left;
             touch-action: manipulation;
+            transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
         }
 
         .rer-detail-toggle:hover,
         .rer-detail-toggle:focus-visible {
-            background: rgba(8, 121, 111, 0.06);
+            border-color: rgba(8, 121, 111, 0.52);
+            background: #f0faf8;
             color: var(--rer-accent-strong);
             outline: none;
-        }
-
-        .rer-detail-rule {
-            height: 1px;
-            flex: 1;
-            background: var(--rer-line);
+            transform: translateY(-1px);
         }
 
         .rer-detail-toggle-label {
-            flex: 0 0 auto;
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
             white-space: nowrap;
+            border: 0;
         }
 
-        .rer-detail-chevron {
-            width: 7px;
-            height: 7px;
-            flex: 0 0 auto;
-            border-right: 1.5px solid currentColor;
-            border-bottom: 1.5px solid currentColor;
-            transform: rotate(45deg) translateY(-2px);
-            transition: transform 140ms ease;
+        .rer-detail-icon {
+            font-size: 17px;
+            line-height: 1;
+            transition: transform 160ms ease;
         }
 
-        .rer-detail-toggle[aria-expanded="true"] .rer-detail-chevron {
-            transform: rotate(225deg) translate(-1px, -1px);
+        .rer-detail-toggle[aria-expanded="true"] .rer-detail-icon {
+            transform: rotate(45deg) scale(1.08);
         }
 
         .rer-detail-toggle.rer-detail-ready {
+            border-color: rgba(8, 121, 111, 0.42);
+            background: #eff9f7;
             color: var(--rer-accent);
+        }
+
+        .rer-detail-toggle[data-rer-loading="true"] .rer-detail-icon {
+            animation: rer-pulse 900ms ease-in-out infinite alternate;
+        }
+
+        @keyframes rer-pulse {
+            from { opacity: 0.45; transform: scale(0.88); }
+            to { opacity: 1; transform: scale(1.08); }
         }
 
         .rer-detail-panel {
@@ -976,23 +996,25 @@
         }
         const readingElements = collectReadingElements(root);
         let changed = 0;
-        for (const { element, isHeadline } of readingElements) {
+        for (const { element, isHeadline, isLinkedTitle } of readingElements) {
             if (element.dataset.rerReadingElement === 'true') continue;
             const text = normalizeReadingText(element.textContent);
-            if (!shouldProcessReadingElement(text, element, isHeadline)) continue;
-            const parts = isHeadline ? [text] : segmentSentences(text);
+            const isTitle = isHeadline || isLinkedTitle;
+            if (!shouldProcessReadingElement(text, element, isTitle)) continue;
+            const parts = isTitle ? [text] : segmentSentences(text);
             if (!parts.length) continue;
+            const linkedParent = isLinkedTitle ? element.parentNode : null;
             element.textContent = '';
             element.dataset.rerReadingElement = 'true';
             if (isHeadline) {
                 element.classList.add('rer-reading-title');
-            } else {
+            } else if (!isLinkedTitle) {
                 element.dataset.rerParagraph = 'true';
             }
             for (const sentenceText of parts) {
                 const id = `${SENTENCE_PREFIX}-${++sentenceCounter}`;
                 const block = document.createElement('span');
-                block.className = 'rer-sentence-block';
+                block.className = `rer-sentence-block${isLinkedTitle ? ' rer-linked-title' : ''}`;
                 const sentenceNode = document.createElement('span');
                 sentenceNode.className = 'rer-sentence';
                 sentenceNode.dataset.rerSentenceId = id;
@@ -1001,19 +1023,27 @@
                 toggleNode.type = 'button';
                 toggleNode.className = 'rer-detail-toggle';
                 toggleNode.dataset.rerSentenceToggle = id;
+                toggleNode.dataset.rerLoading = 'false';
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
+                toggleNode.setAttribute('aria-label', '查看本句精读');
+                toggleNode.title = '查看本句精读';
                 toggleNode.innerHTML = `
-                    <span class="rer-detail-rule"></span>
                     <span class="rer-detail-toggle-label">精读尚未加载</span>
-                    <span class="rer-detail-chevron" aria-hidden="true"></span>
+                    <span class="rer-detail-icon" aria-hidden="true">✦</span>
                 `;
                 const detailNode = document.createElement('span');
                 detailNode.className = 'rer-detail-panel';
                 detailNode.dataset.rerSentenceDetail = id;
                 detailNode.hidden = !config.defaultExpanded;
                 detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
-                block.append(sentenceNode, toggleNode, detailNode);
-                element.append(block);
+                if (isLinkedTitle && linkedParent) {
+                    linkedParent.insertBefore(block, element);
+                    element.append(sentenceNode);
+                    block.append(element, toggleNode, detailNode);
+                } else {
+                    block.append(sentenceNode, toggleNode, detailNode);
+                    element.append(block);
+                }
                 const item = {
                     id,
                     text: sentenceText,
@@ -1021,6 +1051,7 @@
                     node: sentenceNode,
                     toggleNode,
                     detailNode,
+                    analysis: null,
                     ready: false,
                     loading: false
                 };
@@ -1053,11 +1084,46 @@
     function collectReadingElements(root) {
         const headline = findHeadline(root);
         const elements = [];
-        if (headline) elements.push({ element: headline, isHeadline: true });
+        const seen = new Set();
+        const add = (element, isHeadline = false, isLinkedTitle = false) => {
+            if (!element || seen.has(element)) return;
+            seen.add(element);
+            elements.push({ element, isHeadline, isLinkedTitle });
+        };
+        add(headline, true, false);
+        for (const linkedTitle of collectLinkedTitles(root, headline)) add(linkedTitle, false, true);
         for (const paragraph of collectParagraphs(root)) {
-            if (paragraph !== headline) elements.push({ element: paragraph, isHeadline: false });
+            add(paragraph, false, false);
         }
         return elements;
+    }
+
+    function collectLinkedTitles(root, headline) {
+        const selectors = [
+            'h2 a[href]',
+            'h3 a[href]',
+            'h4 a[href]',
+            'a[data-testid*="heading" i][href]',
+            'a[data-testid*="headline" i][href]',
+            'a[data-testid*="title" i][href]',
+            '[data-testid*="heading" i] a[href]',
+            '[data-testid*="headline" i] a[href]',
+            '[data-testid*="title" i] a[href]'
+        ].join(',');
+        const scopes = [root, document.querySelector('main')].filter(Boolean);
+        const linkedTitles = [];
+        const seen = new Set();
+        for (const scope of scopes) {
+            for (const anchor of scope.querySelectorAll(selectors)) {
+                if (!(anchor instanceof HTMLAnchorElement)
+                    || seen.has(anchor)
+                    || (headline && headline.contains(anchor))
+                    || anchor.closest('p, nav, footer, aside, form')) continue;
+                seen.add(anchor);
+                linkedTitles.push(anchor);
+            }
+        }
+        return linkedTitles;
     }
 
     function findHeadline(root) {
@@ -1161,19 +1227,27 @@
     function setDetailExpanded(item, expanded) {
         item.toggleNode.setAttribute('aria-expanded', String(expanded));
         item.detailNode.hidden = !expanded;
+        if (item.ready && item.analysis) {
+            renderSentenceWithSpans(item.node, item.text, expanded ? item.analysis.spans : []);
+        }
         updateDetailToggleLabel(item);
     }
 
     function updateDetailToggleLabel(item) {
         const label = item.toggleNode.querySelector('.rer-detail-toggle-label');
         const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
+        let message = '查看本句精读';
+        item.toggleNode.dataset.rerLoading = String(Boolean(item.loading));
         if (item.ready) {
-            label.textContent = expanded ? '收起本句精读' : '展开本句精读';
+            message = expanded ? '收起本句精读' : '查看本句精读';
         } else if (item.loading) {
-            label.textContent = '精读加载中';
+            message = '精读加载中';
         } else {
-            label.textContent = '精读尚未加载';
+            message = '本句精读尚未加载';
         }
+        label.textContent = message;
+        item.toggleNode.setAttribute('aria-label', message);
+        item.toggleNode.title = message;
     }
 
     function queueAutoAnalyze() {
@@ -1231,6 +1305,7 @@
         for (const item of getConnectedReadingItems()) {
             item.ready = false;
             item.loading = false;
+            item.analysis = null;
             renderSentenceWithSpans(item.node, item.text, []);
             item.node.classList.remove('rer-analyzed');
             item.toggleNode.classList.remove('rer-detail-ready');
@@ -1399,7 +1474,8 @@
         const pattern = deriveStructurePattern(spans);
         const normalized = { translation, phrases, pattern, spans };
         try {
-            renderSentenceWithSpans(item.node, item.text, spans);
+            const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
+            renderSentenceWithSpans(item.node, item.text, expanded ? spans : []);
             renderSentenceDetail(item, normalized);
         } catch (error) {
             console.warn('[Reuters English Reader] Failed to render sentence analysis', error);
@@ -1408,6 +1484,7 @@
         if (item.node.textContent !== item.text || !item.detailNode.textContent.includes(translation)) return false;
         item.ready = true;
         item.loading = false;
+        item.analysis = normalized;
         item.node.classList.add('rer-analyzed');
         item.toggleNode.classList.add('rer-detail-ready');
         updateDetailToggleLabel(item);
