@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.10.0
+// @version      0.10.1
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.10.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 19:17:52 UTC+8';
+    const SCRIPT_VERSION = '0.10.1';
+    const SCRIPT_RELEASED_AT = '2026-08-18 21:27:18 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v3';
@@ -80,15 +80,17 @@
 
     const css = String.raw`
         :root {
-            --rer-ink: #18222d;
-            --rer-muted: #63707d;
-            --rer-line: rgba(38, 52, 66, 0.16);
-            --rer-accent: #08796f;
-            --rer-accent-strong: #055c56;
-            --rer-warm: #a44b27;
-            --rer-panel: #ffffff;
-            --rer-soft: #f4f8f7;
-            --rer-shadow: 0 16px 42px rgba(25, 38, 51, 0.2);
+            --rer-ink: #172631;
+            --rer-muted: #74818a;
+            --rer-subtle: #a5afb4;
+            --rer-line: rgba(23, 38, 49, 0.12);
+            --rer-accent: #087f70;
+            --rer-accent-strong: #056559;
+            --rer-warm: #b45e36;
+            --rer-panel: #fbfcfb;
+            --rer-soft: #f2f7f5;
+            --rer-shadow: 0 22px 58px rgba(18, 32, 42, 0.2), 0 3px 12px rgba(18, 32, 42, 0.08);
+            --rer-ui-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
         }
 
         ::highlight(rer-role-subject) {
@@ -116,14 +118,14 @@
             display: inline-grid;
             box-sizing: border-box;
             place-items: center;
-            width: 20px;
+            width: 21px;
             height: 20px;
-            margin: 0 0.16em;
+            margin: 0 0.18em;
             padding: 0;
             border: 0;
-            border-radius: 4px;
-            background: transparent;
-            color: #73808c;
+            border-radius: 6px;
+            background: #eef5f3;
+            color: #5e807a;
             cursor: pointer;
             box-shadow: none;
             letter-spacing: 0;
@@ -131,14 +133,15 @@
             touch-action: manipulation;
             user-select: none;
             vertical-align: 0.1em;
-            transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+            transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
         }
 
         .rer-detail-toggle:hover,
         .rer-detail-toggle:focus-visible {
-            background: rgba(8, 121, 111, 0.09);
+            background: #e2f1ed;
             color: var(--rer-accent-strong);
             transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(8, 127, 112, 0.14);
         }
 
         .rer-detail-toggle:focus-visible {
@@ -176,7 +179,7 @@
         }
 
         .rer-detail-toggle[aria-expanded="true"] {
-            background: #eaf7f4;
+            background: #dff1ec;
             color: var(--rer-accent-strong);
         }
 
@@ -196,14 +199,14 @@
         .rer-detail-panel {
             display: block;
             box-sizing: border-box;
-            margin: 0 0 0.34em;
-            padding: 0.25em 0.72em 0.72em;
-            border-left: 3px solid rgba(8, 121, 111, 0.24);
-            border-bottom: 1px solid rgba(38, 52, 66, 0.12);
-            border-radius: 0 0 6px 6px;
-            background: rgba(244, 248, 247, 0.72);
+            margin: 0.22em 0 0.54em;
+            padding: 0.35em 0.8em 0.76em;
+            border: 1px solid rgba(8, 127, 112, 0.16);
+            border-left: 3px solid rgba(8, 127, 112, 0.62);
+            border-radius: 0 8px 8px 0;
+            background: #f5faf8;
             color: var(--rer-ink);
-            font: 13px/1.58 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font: 13px/1.58 var(--rer-ui-font);
             letter-spacing: 0;
         }
 
@@ -243,9 +246,9 @@
         .rer-detail-section {
             display: grid;
             grid-template-columns: 62px minmax(0, 1fr);
-            gap: 10px;
-            padding: 0.52em 0;
-            border-bottom: 1px solid rgba(38, 52, 66, 0.1);
+            gap: 12px;
+            padding: 0.58em 0;
+            border-bottom: 1px solid rgba(23, 38, 49, 0.09);
         }
 
         .rer-detail-section:last-child {
@@ -255,8 +258,9 @@
 
         .rer-detail-heading {
             color: var(--rer-muted);
-            font-size: 11px;
-            font-weight: 750;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
             white-space: nowrap;
         }
 
@@ -290,7 +294,7 @@
 
         .rer-phrase-text {
             color: var(--rer-ink);
-            font-weight: 700;
+            font-weight: 750;
         }
 
         .rer-phrase-meaning {
@@ -311,11 +315,11 @@
         .rer-pattern {
             display: inline-flex;
             align-items: center;
-            min-height: 22px;
-            padding: 0 7px;
-            border: 1px solid rgba(8, 121, 111, 0.24);
-            border-radius: 5px;
-            background: rgba(8, 121, 111, 0.07);
+            min-height: 23px;
+            padding: 0 8px;
+            border: 1px solid rgba(8, 127, 112, 0.22);
+            border-radius: 6px;
+            background: #e5f3ef;
             color: var(--rer-accent-strong);
             font-size: 11px;
             font-weight: 800;
@@ -348,38 +352,50 @@
         .rer-settings {
             box-sizing: border-box;
             color: var(--rer-ink);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-family: var(--rer-ui-font);
             letter-spacing: 0;
             z-index: 2147483646;
         }
 
         .rer-toolbar {
             position: fixed;
-            top: 72px;
-            right: 18px;
+            top: 68px;
+            right: 20px;
             display: flex;
             align-items: center;
             width: auto;
             max-width: calc(100vw - 24px);
-            min-height: 44px;
-            gap: 5px;
-            padding: 5px 6px;
-            border: 1px solid rgba(38, 52, 66, 0.17);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.97);
+            min-height: 46px;
+            gap: 7px;
+            padding: 6px 7px 6px 10px;
+            border: 1px solid rgba(23, 38, 49, 0.12);
+            border-radius: 14px;
+            background: rgba(251, 252, 251, 0.96);
             box-shadow: var(--rer-shadow);
             backdrop-filter: blur(12px);
             overflow: hidden;
         }
 
         .rer-status {
-            min-width: 38px;
-            padding: 0 5px;
-            color: var(--rer-muted);
+            min-width: 34px;
+            padding: 0 4px;
+            color: var(--rer-ink);
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 800;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
+        }
+
+        .rer-status::before {
+            content: "";
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            margin: 0 6px 1px 0;
+            border-radius: 50%;
+            background: #23a77e;
+            box-shadow: 0 0 0 3px rgba(35, 167, 126, 0.12);
+            vertical-align: middle;
         }
 
         .rer-toolbar-actions {
@@ -391,14 +407,14 @@
         .rer-button {
             appearance: none;
             min-width: 0;
-            min-height: 34px;
-            padding: 0 9px;
-            border: 1px solid rgba(8, 121, 111, 0.28);
-            border-radius: 6px;
-            background: #f7fbfa;
+            min-height: 35px;
+            padding: 0 11px;
+            border: 1px solid rgba(23, 38, 49, 0.13);
+            border-radius: 8px;
+            background: #f4f8f7;
             color: var(--rer-accent-strong);
             cursor: pointer;
-            font: 650 12px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font: 700 12px/1 var(--rer-ui-font);
             letter-spacing: 0;
             white-space: nowrap;
             touch-action: manipulation;
@@ -406,8 +422,8 @@
 
         .rer-button:hover,
         .rer-button:focus-visible {
-            background: #eaf6f3;
-            border-color: rgba(8, 121, 111, 0.5);
+            background: #e4f2ee;
+            border-color: rgba(8, 127, 112, 0.35);
             outline: none;
         }
 
@@ -420,6 +436,7 @@
             border-color: var(--rer-accent);
             background: var(--rer-accent);
             color: #ffffff;
+            box-shadow: 0 4px 10px rgba(8, 127, 112, 0.2);
         }
 
         .rer-button-primary:hover,
@@ -428,9 +445,9 @@
         }
 
         .rer-button-danger {
-            border-color: rgba(190, 48, 57, 0.34);
-            background: #fff7f7;
-            color: #a12e38;
+            border-color: rgba(190, 48, 57, 0.22);
+            background: #fff8f7;
+            color: #ad3d46;
         }
 
         .rer-button-danger:hover,
@@ -440,15 +457,16 @@
         }
 
         .rer-toolbar .rer-button {
-            min-height: 32px;
+            min-height: 34px;
             padding: 0 9px;
         }
 
         .rer-toolbar .rer-icon-button {
             display: inline-grid;
             place-items: center;
-            width: 32px;
+            width: 34px;
             padding: 0;
+            border-radius: 9px;
         }
 
         .rer-toolbar-icon {
@@ -466,19 +484,20 @@
             position: fixed;
             inset: 0;
             z-index: 2147483645;
-            background: rgba(12, 19, 27, 0.32);
+            background: rgba(17, 29, 37, 0.3);
+            backdrop-filter: blur(2px);
         }
 
         .rer-settings {
             position: fixed;
-            top: 72px;
-            right: 16px;
-            width: min(390px, calc(100vw - 32px));
-            max-height: calc(100vh - 92px);
+            top: 68px;
+            right: 20px;
+            width: min(370px, calc(100vw - 32px));
+            max-height: calc(100vh - 84px);
             overflow: auto;
             padding: 0;
-            border: 1px solid rgba(38, 52, 66, 0.18);
-            border-radius: 8px;
+            border: 1px solid rgba(23, 38, 49, 0.13);
+            border-radius: 14px;
             background: var(--rer-panel);
             box-shadow: var(--rer-shadow);
         }
@@ -486,96 +505,132 @@
         .rer-settings-header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 11px 14px;
-            border-bottom: 1px solid rgba(38, 52, 66, 0.11);
+            gap: 11px;
+            padding: 16px 17px 14px;
+            border-bottom: 1px solid var(--rer-line);
+            background: #f3f8f6;
+        }
+
+        .rer-settings-mark {
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            flex: 0 0 auto;
+            border-radius: 9px;
+            background: var(--rer-accent);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 850;
+            letter-spacing: -0.02em;
+            box-shadow: 0 5px 12px rgba(8, 127, 112, 0.2);
+        }
+
+        .rer-settings-title {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .rer-settings-eyebrow {
+            margin: 0 0 2px;
+            color: var(--rer-accent-strong);
+            font-size: 9px;
+            font-weight: 850;
+            letter-spacing: 0.12em;
+            line-height: 1.2;
+            text-transform: uppercase;
         }
 
         .rer-settings-header h2 {
             flex: 1;
             margin: 0;
-            font-size: 15px;
+            color: var(--rer-ink);
+            font-size: 17px;
+            font-weight: 800;
             line-height: 1.25;
         }
 
         .rer-settings-close {
             appearance: none;
-            width: 32px;
-            height: 32px;
-            border: 0;
-            border-radius: 6px;
-            background: transparent;
+            width: 30px;
+            height: 30px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: rgba(23, 38, 49, 0.05);
             color: var(--rer-muted);
             cursor: pointer;
-            font-size: 20px;
+            font-size: 21px;
             line-height: 1;
         }
 
         .rer-settings-close:hover,
         .rer-settings-close:focus-visible {
-            background: rgba(38, 52, 66, 0.07);
+            border-color: rgba(23, 38, 49, 0.12);
+            background: rgba(23, 38, 49, 0.09);
             outline: none;
         }
 
         .rer-settings-body {
-            padding: 12px 14px 8px;
+            padding: 15px 17px 10px;
         }
 
         .rer-settings-command-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
-            gap: 10px;
-            padding: 0 0 12px;
-            border-bottom: 1px solid rgba(38, 52, 66, 0.1);
+            gap: 9px;
+            padding: 0 0 14px;
+            border-bottom: 1px solid var(--rer-line);
         }
 
         .rer-load-all-button {
-            min-height: 36px;
+            min-height: 39px;
         }
 
         .rer-batch-control {
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 6px;
             color: var(--rer-muted);
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             white-space: nowrap;
         }
 
         .rer-api-fields {
             display: grid;
-            gap: 8px;
-            padding: 12px 0;
+            gap: 9px;
+            padding: 14px 0;
         }
 
         .rer-api-row {
             display: grid;
-            grid-template-columns: 32px minmax(0, 1fr);
+            grid-template-columns: 34px minmax(0, 1fr);
             align-items: center;
             gap: 9px;
-            color: var(--rer-muted);
+            color: #607078;
             font-size: 10px;
             font-weight: 800;
+            letter-spacing: 0.08em;
         }
 
         .rer-api-row input {
             box-sizing: border-box;
             width: 100%;
             min-width: 0;
-            min-height: 36px;
-            padding: 7px 9px;
-            border: 1px solid rgba(38, 52, 66, 0.2);
-            border-radius: 6px;
+            min-height: 39px;
+            padding: 8px 11px;
+            border: 1px solid rgba(23, 38, 49, 0.16);
+            border-radius: 9px;
+            background: #ffffff;
             color: var(--rer-ink);
-            font: 13px/1.3 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font: 13px/1.3 var(--rer-ui-font);
             letter-spacing: 0;
         }
 
         .rer-api-row input:focus {
-            border-color: rgba(8, 121, 111, 0.7);
-            outline: 2px solid rgba(8, 121, 111, 0.14);
+            border-color: rgba(8, 127, 112, 0.7);
+            outline: 3px solid rgba(8, 127, 112, 0.12);
         }
 
         .rer-help {
@@ -589,9 +644,9 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            min-height: 38px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(38, 52, 66, 0.1);
+            min-height: 39px;
+            padding-top: 10px;
+            border-top: 1px solid var(--rer-line);
             color: var(--rer-muted);
             font-size: 11px;
             font-weight: 700;
@@ -599,19 +654,20 @@
 
         .rer-setting-number {
             box-sizing: border-box;
-            width: 68px;
-            min-height: 34px;
+            width: 62px;
+            min-height: 35px;
             padding: 5px 8px;
-            border: 1px solid rgba(38, 52, 66, 0.2);
-            border-radius: 6px;
+            border: 1px solid rgba(23, 38, 49, 0.16);
+            border-radius: 8px;
+            background: #ffffff;
             color: var(--rer-ink);
             font: 13px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             text-align: center;
         }
 
         .rer-setting-number:focus {
-            border-color: rgba(8, 121, 111, 0.7);
-            outline: 2px solid rgba(8, 121, 111, 0.14);
+            border-color: rgba(8, 127, 112, 0.7);
+            outline: 3px solid rgba(8, 127, 112, 0.12);
         }
 
         .rer-settings-footer {
@@ -619,28 +675,29 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 10px 14px;
-            border-top: 1px solid rgba(38, 52, 66, 0.11);
-            background: #fafbfb;
+            padding: 12px 17px 14px;
+            border-top: 1px solid var(--rer-line);
+            background: #f7faf9;
         }
 
         .rer-settings-version {
             color: var(--rer-muted);
             font-size: 10px;
+            font-variant-numeric: tabular-nums;
         }
 
         @media (max-width: 560px) {
             .rer-toolbar {
-                top: 62px;
+                top: 58px;
                 right: 12px;
                 width: auto;
             }
 
             .rer-settings {
-                top: 62px;
+                top: 58px;
                 right: 10px;
                 width: calc(100vw - 20px);
-                max-height: calc(100vh - 72px);
+                max-height: calc(100vh - 68px);
             }
 
             .rer-detail-section {
@@ -810,14 +867,18 @@
         panel.setAttribute('aria-label', 'Reuters English Reader settings');
         panel.innerHTML = `
             <div class="rer-settings-header">
-                <h2>精读</h2>
+                <span class="rer-settings-mark" aria-hidden="true">R</span>
+                <div class="rer-settings-title">
+                    <p class="rer-settings-eyebrow">REUTERS READER</p>
+                    <h2>Reader settings</h2>
+                </div>
                 <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
             </div>
             <div class="rer-settings-body">
                 <div class="rer-settings-command-row">
-                    <button type="button" class="rer-button rer-load-all-button" data-rer-settings="load-all">加载全文</button>
+                    <button type="button" class="rer-button rer-button-primary rer-load-all-button" data-rer-settings="load-all">Analyze all</button>
                     <label class="rer-batch-control" for="rer-sentences-per-load">
-                        <span>每批</span>
+                        <span>Batch</span>
                         <input class="rer-setting-number" id="rer-sentences-per-load" type="number" min="1" max="10" step="1" inputmode="numeric">
                     </label>
                 </div>
@@ -832,13 +893,13 @@
                     </label>
                 </div>
                 <div class="rer-cache-row">
-                    <span>缓存</span>
-                    <button type="button" class="rer-button rer-button-danger" data-rer-settings="clear-cache">清除</button>
+                    <span>Cache</span>
+                    <button type="button" class="rer-button rer-button-danger" data-rer-settings="clear-cache">Clear</button>
                 </div>
             </div>
             <div class="rer-settings-footer">
                 <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)}</div>
-                <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">保存</button>
+                <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">Save</button>
             </div>
         `;
         settingsRoot = document.createElement('div');
