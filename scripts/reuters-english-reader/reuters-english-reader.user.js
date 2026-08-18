@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.5.0
+// @version      0.6.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.5.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 16:20:43 UTC+8';
+    const SCRIPT_VERSION = '0.6.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 16:48:52 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
@@ -74,7 +74,9 @@
     let autoAnalyzeQueuedKey = '';
     let autoAnalyzedArticleKey = '';
     let analysisGeneration = 0;
+    let queuedFullAnalysis = false;
     const sentences = new Map();
+    const queuedSentenceIds = new Set();
 
     const css = String.raw`
         :root {
@@ -113,20 +115,22 @@
             display: inline-grid;
             box-sizing: border-box;
             place-items: center;
-            width: 26px;
-            height: 26px;
-            margin: 0 0.24em;
+            width: 20px;
+            height: 20px;
+            margin: 0 0.16em;
             padding: 0;
             border: 1px solid rgba(8, 121, 111, 0.2);
-            border-radius: 50%;
+            border-radius: 4px;
             background: #ffffff;
             color: var(--rer-muted);
             cursor: pointer;
-            box-shadow: 0 3px 10px rgba(25, 38, 51, 0.1);
-            font: 600 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            box-shadow: 0 2px 6px rgba(25, 38, 51, 0.1);
+            font: 750 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             letter-spacing: 0;
+            text-decoration: none;
             touch-action: manipulation;
-            vertical-align: 0.08em;
+            user-select: none;
+            vertical-align: 0.1em;
             transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
         }
 
@@ -139,41 +143,19 @@
             transform: translateY(-1px);
         }
 
-        .rer-detail-toggle-label {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        .rer-detail-icon {
-            font-size: 17px;
-            line-height: 1;
-            transition: transform 160ms ease;
-        }
-
-        .rer-detail-toggle[aria-expanded="true"] .rer-detail-icon {
-            transform: rotate(45deg) scale(1.08);
-        }
-
         .rer-detail-toggle.rer-detail-ready {
             border-color: rgba(8, 121, 111, 0.42);
             background: #eff9f7;
             color: var(--rer-accent);
         }
 
-        .rer-detail-toggle[data-rer-loading="true"] .rer-detail-icon {
+        .rer-detail-toggle[data-rer-loading="true"] {
             animation: rer-pulse 900ms ease-in-out infinite alternate;
         }
 
         @keyframes rer-pulse {
-            from { opacity: 0.45; transform: scale(0.88); }
-            to { opacity: 1; transform: scale(1.08); }
+            from { opacity: 0.48; }
+            to { opacity: 1; }
         }
 
         .rer-detail-panel {
@@ -192,6 +174,35 @@
 
         .rer-detail-panel[hidden] {
             display: none !important;
+        }
+
+        .rer-detail-empty {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            padding: 0.35em 0 0;
+        }
+
+        .rer-detail-empty-copy {
+            min-width: 0;
+            color: var(--rer-muted);
+            font-size: 12px;
+            writing-mode: horizontal-tb;
+        }
+
+        .rer-detail-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .rer-detail-actions .rer-button {
+            min-height: 30px;
+            padding: 0 8px;
+            font-size: 11px;
         }
 
         .rer-detail-section {
@@ -772,6 +783,7 @@
         if (typeof GM_registerMenuCommand !== 'function') return;
         GM_registerMenuCommand('Reuters Reader: 设置', showSettings);
         GM_registerMenuCommand('Reuters Reader: 继续精读', () => analyzeSentences());
+        GM_registerMenuCommand('Reuters Reader: 加载全文', requestFullArticleAnalysis);
     }
 
     function showSettings() {
@@ -944,24 +956,21 @@
             element.dataset.rerReadingElement = 'true';
             const prepared = parts.map((part) => {
                 const id = `${SENTENCE_PREFIX}-${++sentenceCounter}`;
-                const toggleNode = document.createElement('button');
-                toggleNode.type = 'button';
+                const toggleNode = document.createElement('span');
                 toggleNode.className = 'rer-detail-toggle rer-inline-control';
                 toggleNode.dataset.rerSentenceToggle = id;
                 toggleNode.dataset.rerLoading = 'false';
+                toggleNode.setAttribute('role', 'button');
+                toggleNode.setAttribute('tabindex', '0');
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
                 toggleNode.setAttribute('aria-label', '查看本句精读');
                 toggleNode.title = '查看本句精读';
-                toggleNode.innerHTML = `
-                    <span class="rer-detail-toggle-label">精读尚未加载</span>
-                    <span class="rer-detail-icon" aria-hidden="true">✦</span>
-                `;
+                toggleNode.textContent = '译';
                 const detailNode = document.createElement('span');
                 detailNode.className = 'rer-detail-panel';
                 detailNode.dataset.rerSentenceDetail = id;
                 detailNode.hidden = !config.defaultExpanded;
-                detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
-                return {
+                const item = {
                     id,
                     text: part.text,
                     start: part.start,
@@ -972,8 +981,12 @@
                     detailNode,
                     analysis: null,
                     ready: false,
-                    loading: false
+                    loading: false,
+                    queued: false
                 };
+                installSentenceToggleHandlers(item);
+                renderUnloadedDetail(item);
+                return item;
             });
             for (const item of prepared.slice().reverse()) {
                 insertSentenceControls(item, textMap, isLinkedTitle);
@@ -1040,23 +1053,20 @@
     }
 
     function insertSentenceControls(item, textMap, isLinkedTitle) {
-        if (isLinkedTitle) {
-            item.element.after(item.toggleNode, item.detailNode);
-            return;
-        }
         const point = textMap.positions[item.end - 1];
         if (!point || !point.node.isConnected) return;
         const endingLink = point.node.parentElement && point.node.parentElement.closest('a');
-        if (endingLink && item.element.contains(endingLink)) {
-            endingLink.after(item.toggleNode, item.detailNode);
-            return;
-        }
         const range = document.createRange();
         range.setStart(point.node, point.end);
         range.collapse(true);
-        const fragment = document.createDocumentFragment();
-        fragment.append(item.toggleNode, item.detailNode);
-        range.insertNode(fragment);
+        range.insertNode(item.toggleNode);
+        if (isLinkedTitle) {
+            item.element.after(item.detailNode);
+        } else if (endingLink && item.element.contains(endingLink)) {
+            endingLink.after(item.detailNode);
+        } else {
+            item.toggleNode.after(item.detailNode);
+        }
     }
 
     function findArticleRoot() {
@@ -1206,14 +1216,33 @@
 
     function installInteractionHandlers() {
         document.addEventListener('click', (event) => {
-            const toggle = event.target.closest('[data-rer-sentence-toggle]');
-            if (!toggle) return;
-            const item = sentences.get(toggle.dataset.rerSentenceToggle);
+            const actionNode = event.target.closest('[data-rer-sentence-action]');
+            if (!actionNode) return;
+            const item = sentences.get(actionNode.dataset.rerSentenceId);
             if (!item) return;
-            setDetailExpanded(item, toggle.getAttribute('aria-expanded') !== 'true');
+            const action = actionNode.dataset.rerSentenceAction;
+            if (action === 'load-one') {
+                setDetailExpanded(item, true);
+                analyzeSentences({ items: [item] });
+            } else if (action === 'load-all') {
+                requestFullArticleAnalysis();
+            }
         });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') closeSettings();
+        });
+    }
+
+    function installSentenceToggleHandlers(item) {
+        const activate = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setDetailExpanded(item, item.toggleNode.getAttribute('aria-expanded') !== 'true');
+        };
+        item.toggleNode.addEventListener('click', activate);
+        item.toggleNode.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            activate(event);
         });
     }
 
@@ -1259,18 +1288,18 @@
     }
 
     function updateDetailToggleLabel(item) {
-        const label = item.toggleNode.querySelector('.rer-detail-toggle-label');
         const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
         let message = '查看本句精读';
-        item.toggleNode.dataset.rerLoading = String(Boolean(item.loading));
+        item.toggleNode.dataset.rerLoading = String(Boolean(item.loading || item.queued));
         if (item.ready) {
             message = expanded ? '收起本句精读' : '查看本句精读';
         } else if (item.loading) {
             message = '精读加载中';
+        } else if (item.queued) {
+            message = '本句等待加载';
         } else {
             message = '本句精读尚未加载';
         }
-        label.textContent = message;
         item.toggleNode.setAttribute('aria-label', message);
         item.toggleNode.title = message;
     }
@@ -1324,15 +1353,18 @@
         window.clearTimeout(autoAnalyzeTimer);
         autoAnalyzeQueuedKey = '';
         autoAnalyzedArticleKey = `${location.origin}${location.pathname}`;
+        queuedFullAnalysis = false;
+        queuedSentenceIds.clear();
         analysisCache = {};
         safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
 
         for (const item of getConnectedReadingItems()) {
             item.ready = false;
             item.loading = false;
+            item.queued = false;
             item.analysis = null;
             item.toggleNode.classList.remove('rer-detail-ready');
-            item.detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
+            renderUnloadedDetail(item);
             item.toggleNode.setAttribute('aria-expanded', 'false');
             item.detailNode.hidden = true;
             updateDetailToggleLabel(item);
@@ -1348,14 +1380,24 @@
     }
 
     async function analyzeSentences(options = {}) {
-        if (analyzeRunning || !config.enabled) return;
+        if (!config.enabled) return;
+        if (analyzeRunning) {
+            queueAnalysisRequest(options);
+            return;
+        }
         if (!ensureReady()) return;
         enhanceArticle();
         const ordered = getConnectedReadingItems();
-        const candidates = options.automatic
-            ? ordered.slice(0, config.sentencesPerLoad)
-            : ordered.filter((item) => !item.ready).slice(0, config.sentencesPerLoad);
-        const pending = candidates.filter((item) => !item.ready && !item.loading);
+        const requestedItems = Array.isArray(options.items) ? new Set(options.items) : null;
+        const candidates = requestedItems
+            ? ordered.filter((item) => requestedItems.has(item))
+            : ordered;
+        const available = candidates.filter((item) => !item.ready
+            && !item.loading
+            && (!item.queued || requestedItems || options.all));
+        const pending = options.all || requestedItems
+            ? available
+            : available.slice(0, config.sentencesPerLoad);
         if (!pending.length) {
             updateLoadedCount();
             return;
@@ -1364,6 +1406,8 @@
         analyzeRunning = true;
         setContinueButtonState(true);
         for (const item of pending) {
+            item.queued = false;
+            queuedSentenceIds.delete(item.id);
             item.loading = true;
             setDetailMessage(item, '正在后台准备本句精读...');
             updateDetailToggleLabel(item);
@@ -1404,13 +1448,60 @@
         } finally {
             for (const item of pending) {
                 item.loading = false;
-                if (!item.ready) setDetailMessage(item, '本句精读暂未加载。');
+                if (!item.ready) {
+                    renderUnloadedDetail(item, failures.has(item) ? '加载失败，请重试。' : '本句尚未精读');
+                }
                 updateDetailToggleLabel(item);
             }
             analyzeRunning = false;
             setContinueButtonState(false);
             updateLoadedCount();
+            window.setTimeout(drainQueuedAnalysis, 0);
         }
+    }
+
+    function queueAnalysisRequest(options) {
+        if (options.all) {
+            queuedFullAnalysis = true;
+            return;
+        }
+        if (!Array.isArray(options.items)) return;
+        for (const item of options.items) {
+            if (!item || item.ready || item.loading || item.queued) continue;
+            item.queued = true;
+            queuedSentenceIds.add(item.id);
+            setDetailMessage(item, '已加入加载队列...');
+            updateDetailToggleLabel(item);
+        }
+    }
+
+    function drainQueuedAnalysis() {
+        if (analyzeRunning) return;
+        if (queuedFullAnalysis) {
+            queuedFullAnalysis = false;
+            for (const id of queuedSentenceIds) {
+                const item = sentences.get(id);
+                if (item) item.queued = false;
+            }
+            queuedSentenceIds.clear();
+            analyzeSentences({ all: true });
+            return;
+        }
+        const items = Array.from(queuedSentenceIds, (id) => sentences.get(id)).filter(Boolean);
+        queuedSentenceIds.clear();
+        if (items.length) analyzeSentences({ items });
+    }
+
+    function requestFullArticleAnalysis() {
+        if (!config.enabled || !ensureReady()) return;
+        enhanceArticle();
+        const remaining = getConnectedReadingItems().filter((item) => !item.ready).length;
+        if (!remaining) {
+            window.alert('本文已经全部加载。');
+            return;
+        }
+        if (!window.confirm(`将加载本文尚未完成的 ${remaining} 句，可能产生较多 API 请求。继续吗？`)) return;
+        analyzeSentences({ all: true });
     }
 
     async function analyzeBatchWithFallback(batch, retryInvalid = true) {
@@ -1508,6 +1599,8 @@
         if (!item.detailNode.textContent.includes(translation)) return false;
         item.ready = true;
         item.loading = false;
+        item.queued = false;
+        queuedSentenceIds.delete(item.id);
         item.analysis = normalized;
         item.toggleNode.classList.add('rer-detail-ready');
         updateDetailToggleLabel(item);
@@ -1618,6 +1711,19 @@
     function setDetailMessage(item, message) {
         if (item.ready) return;
         item.detailNode.innerHTML = `<span class="rer-help">${escapeHtml(message)}</span>`;
+    }
+
+    function renderUnloadedDetail(item, message = '本句尚未精读') {
+        if (item.ready) return;
+        item.detailNode.innerHTML = `
+            <span class="rer-detail-empty">
+                <span class="rer-detail-empty-copy">${escapeHtml(message)}</span>
+                <span class="rer-detail-actions">
+                    <button type="button" class="rer-button rer-button-primary" data-rer-sentence-action="load-one" data-rer-sentence-id="${escapeHtml(item.id)}">精读本句</button>
+                    <button type="button" class="rer-button" data-rer-sentence-action="load-all" data-rer-sentence-id="${escapeHtml(item.id)}">加载全文</button>
+                </span>
+            </span>
+        `;
     }
 
     async function requestChat(payload, options = {}) {
