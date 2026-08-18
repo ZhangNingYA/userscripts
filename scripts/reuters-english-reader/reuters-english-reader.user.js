@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.7.0
+// @version      0.8.0
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,11 +26,11 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.7.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 17:25:48 UTC+8';
+    const SCRIPT_VERSION = '0.8.0';
+    const SCRIPT_RELEASED_AT = '2026-08-18 17:50:24 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
-    const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
+    const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v3';
     const SENTENCE_PREFIX = 'rer-s';
     const ANALYSIS_BATCH_SIZE = 3;
     const ANALYSIS_CONCURRENCY = 2;
@@ -1373,7 +1373,7 @@
     }
 
     function getSentenceCacheKey(text) {
-        const value = `v2\n${config.model}\n${config.targetLanguage}\n${text}`;
+        const value = `v3\n${config.model}\n${config.targetLanguage}\n${text}`;
         let hash = 2166136261;
         for (let index = 0; index < value.length; index += 1) {
             hash ^= value.charCodeAt(index);
@@ -1389,6 +1389,7 @@
             phrases: result.phrases,
             pattern: result.pattern,
             spans: result.spans,
+            structureReliable: result.structureReliable,
             savedAt: Date.now()
         };
     }
@@ -1583,7 +1584,11 @@
                 'For each sentence return id, translation, phrases, pattern, and spans.',
                 'phrases contains 1 to 3 difficult or important phrases as {text, meaning}.',
                 'pattern must be exactly one of SV, SVO, SVC, or SVOC.',
-                'spans uses exact zero-based character offsets and only roles subject, predicate, object, complement.',
+                'spans uses exact zero-based character offsets, a 1-based standalone occurrence, and only roles subject, predicate, object, complement.',
+                'Identify the finite predicate of the main clause first, then select only the subject governed by that predicate and its object or complement.',
+                'Do not use a subject, predicate, object, or complement from a subordinate or relative clause when marking the main clause.',
+                'Every span text must be an exact whole word or phrase from the sentence; never start or end inside a larger word.',
+                'occurrence counts only exact standalone matches of span text, never text embedded inside another word.',
                 'Mark only the shortest main-clause core: at most one span per role and at most four spans total.',
                 'For an active transitive main verb, always include its direct object and use SVO or SVOC.',
                 'For a linking verb, include its subject complement and use SVC.',
@@ -1593,15 +1598,17 @@
             ].join(' '),
             user: [
                 'Translate each sentence into natural Simplified Chinese, explain its key phrases, and identify only its core clause structure.',
-                'Return an array like [{"id":"rer-s-1","translation":"...","phrases":[{"text":"...","meaning":"..."}],"pattern":"SVO","spans":[{"text":"Reuters","start":0,"end":7,"role":"subject"}]}].',
-                'Keep names, numbers, organizations, and dates accurate. Offsets must match the original text exactly.',
+                'Return an array like [{"id":"rer-s-1","translation":"...","phrases":[{"text":"...","meaning":"..."}],"pattern":"SVO","spans":[{"text":"Reuters","start":0,"end":7,"occurrence":1,"role":"subject"}]}].',
+                'Keep names, numbers, organizations, and dates accurate. Offsets, standalone occurrence, and exact span text must all refer to the same phrase.',
                 JSON.stringify(payload)
             ].join('\n')
         }, { splitOnTimeout: batch.length > 1 });
         const parsed = parseJsonMaybe(response);
         const sourceById = new Map(batch.map((item) => [item.id, item]));
+        const parsedIds = Array.isArray(parsed) ? new Set(parsed.map((result) => result && result.id)) : new Set();
         if (!Array.isArray(parsed)
-            || parsed.length < batch.length
+            || parsed.length !== batch.length
+            || parsedIds.size !== batch.length
             || !parsed.every((result) => isAnalysisResultValid(result, sourceById.get(result && result.id)))) {
             throw createRequestError('模型没有返回可解析的精读 JSON。', false, 'invalid-analysis');
         }
@@ -1609,11 +1616,7 @@
     }
 
     function isAnalysisResultValid(result, item) {
-        if (!result || !item || !normalizeReadingText(result.translation || result.text || '')) return false;
-        const spans = sanitizeSpans(result.spans, item.text);
-        const derivedPattern = deriveStructurePattern(spans);
-        const statedPattern = normalizeStructurePattern(result.pattern);
-        return derivedPattern !== '未完整识别' && statedPattern === derivedPattern;
+        return Boolean(result && item && normalizeReadingText(result.translation || result.text || ''));
     }
 
     function normalizeStructurePattern(value) {
@@ -1632,9 +1635,13 @@
         const translation = normalizeReadingText(result.translation || result.text || '');
         if (!translation) return false;
         const phrases = sanitizePhrases(result.phrases);
-        const spans = sanitizeSpans(result.spans, item.text);
-        const pattern = deriveStructurePattern(spans);
-        const normalized = { translation, phrases, pattern, spans };
+        const candidateSpans = sanitizeSpans(result.spans, item.text);
+        const statedPattern = normalizeStructurePattern(result.pattern);
+        const derivedPattern = deriveStructurePattern(candidateSpans);
+        const structureReliable = Boolean(statedPattern && statedPattern === derivedPattern);
+        const spans = structureReliable ? candidateSpans : [];
+        const pattern = structureReliable ? derivedPattern : '未完整识别';
+        const normalized = { translation, phrases, pattern, spans, structureReliable };
         try {
             renderSentenceDetail(item, normalized);
         } catch (error) {
@@ -1667,8 +1674,7 @@
 
     function sanitizeSpans(spans, text) {
         if (!Array.isArray(spans)) return [];
-        const seenRoles = new Set();
-        return spans
+        const normalized = spans
             .map((span) => normalizeSpan(span, text))
             .filter((span) => Number.isInteger(span.start)
                 && Number.isInteger(span.end)
@@ -1676,39 +1682,91 @@
                 && span.end > span.start
                 && span.end <= text.length
                 && ROLE_CLASS[span.role])
-            .sort((a, b) => a.start - b.start || b.end - a.end)
-            .reduce((accepted, span) => {
-                const last = accepted[accepted.length - 1];
-                if (seenRoles.has(span.role) || (last && span.start < last.end) || accepted.length >= 4) return accepted;
-                seenRoles.add(span.role);
-                accepted.push(span);
-                return accepted;
-            }, []);
+            .sort((a, b) => a.start - b.start || b.end - a.end);
+        if (normalized.length > 4) return [];
+        const seenRoles = new Set();
+        let previous = null;
+        for (const span of normalized) {
+            if (seenRoles.has(span.role) || (previous && span.start < previous.end)) return [];
+            seenRoles.add(span.role);
+            previous = span;
+        }
+        return normalized;
     }
 
     function normalizeSpan(span, text) {
         const role = normalizeRole(span && span.role);
         const exactText = String(span && span.text || '').trim();
-        let start = Number(span && span.start);
-        let end = Number(span && span.end);
+        if (!exactText || !ROLE_CLASS[role]) return { start: -1, end: -1, role };
+        const matches = findStandaloneExactMatches(text, exactText);
+        const start = Number(span && span.start);
+        const end = Number(span && span.end);
         const offsetsValid = Number.isInteger(start)
             && Number.isInteger(end)
             && start >= 0
             && end > start
-            && end <= text.length;
-        if (exactText && (!offsetsValid || text.slice(start, end) !== exactText)) {
-            start = text.indexOf(exactText);
-            end = start >= 0 ? start + exactText.length : -1;
+            && end <= text.length
+            && text.slice(start, end) === exactText
+            && hasStandaloneBoundaries(text, start, end);
+        const offsetMatch = offsetsValid ? { start, end } : null;
+        const hasOccurrence = span && span.occurrence !== undefined && span.occurrence !== null && span.occurrence !== '';
+        const occurrence = Number(span && span.occurrence);
+        const occurrenceMatch = Number.isInteger(occurrence) && occurrence >= 1
+            ? matches[occurrence - 1] || null
+            : null;
+        if (hasOccurrence && !occurrenceMatch) return { start: -1, end: -1, role };
+        if (offsetMatch && occurrenceMatch
+            && (offsetMatch.start !== occurrenceMatch.start || offsetMatch.end !== occurrenceMatch.end)) {
+            return { start: -1, end: -1, role };
         }
-        return { start, end, role };
+        if (occurrenceMatch) return { ...occurrenceMatch, role };
+        if (offsetMatch) return { ...offsetMatch, role };
+        if (matches.length === 1) return { ...matches[0], role };
+        if (Number.isInteger(start) && matches.length > 1) {
+            const ranked = matches
+                .map((match) => ({ match, distance: Math.abs(match.start - start) }))
+                .sort((left, right) => left.distance - right.distance);
+            const tolerance = Math.max(2, Math.round(exactText.length * 0.15));
+            if (ranked[0].distance <= tolerance
+                && (!ranked[1] || ranked[1].distance > ranked[0].distance)) {
+                return { ...ranked[0].match, role };
+            }
+        }
+        return { start: -1, end: -1, role };
+    }
+
+    function findStandaloneExactMatches(text, exactText) {
+        const matches = [];
+        let cursor = 0;
+        while (cursor <= text.length - exactText.length) {
+            const start = text.indexOf(exactText, cursor);
+            if (start < 0) break;
+            const end = start + exactText.length;
+            if (hasStandaloneBoundaries(text, start, end)) matches.push({ start, end });
+            cursor = start + Math.max(1, exactText.length);
+        }
+        return matches;
+    }
+
+    function hasStandaloneBoundaries(text, start, end) {
+        const startsWithWord = isWordCharacter(text[start]);
+        const endsWithWord = isWordCharacter(text[end - 1]);
+        if (startsWithWord && start > 0 && isWordCharacter(text[start - 1])) return false;
+        if (endsWithWord && end < text.length && isWordCharacter(text[end])) return false;
+        return true;
+    }
+
+    function isWordCharacter(character) {
+        return Boolean(character && /[\p{L}\p{N}_]/u.test(character));
     }
 
     function deriveStructurePattern(spans) {
         const roles = new Set(spans.map((span) => span.role));
+        if (!roles.has('subject') || !roles.has('predicate')) return '未完整识别';
         if (roles.has('object') && roles.has('complement')) return 'SVOC';
         if (roles.has('object')) return 'SVO';
         if (roles.has('complement')) return 'SVC';
-        return roles.has('subject') && roles.has('predicate') ? 'SV' : '未完整识别';
+        return 'SV';
     }
 
     function normalizeRole(role) {
@@ -1726,14 +1784,14 @@
                 </span>
             `).join('')
             : '<span class="rer-help">无额外重点词组</span>';
-        const structureHtml = result.spans.length
+        const structureHtml = result.structureReliable && result.spans.length
             ? result.spans.map((span) => `
                 <span class="rer-structure-row">
                     <span class="rer-role-label" data-role="${escapeHtml(span.role)}">${escapeHtml(ROLE_LABEL[span.role] || span.role)}</span>
                     <span>${escapeHtml(item.text.slice(span.start, span.end))}</span>
                 </span>
             `).join('')
-            : '<span class="rer-help">未识别到明确主干</span>';
+            : '<span class="rer-help">未能可靠定位，已省略结构高亮</span>';
         item.detailNode.innerHTML = `
             <span class="rer-detail-section">
                 <span class="rer-detail-heading">译文</span>
