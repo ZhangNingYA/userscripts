@@ -3,7 +3,7 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.3.0
+// @version      0.3.1
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -26,8 +26,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.3.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 14:40:21 UTC+8';
+    const SCRIPT_VERSION = '0.3.1';
+    const SCRIPT_RELEASED_AT = '2026-08-18 15:04:47 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v2';
@@ -73,6 +73,7 @@
     let autoAnalyzeTimer = 0;
     let autoAnalyzeQueuedKey = '';
     let autoAnalyzedArticleKey = '';
+    let analysisGeneration = 0;
     const sentences = new Map();
 
     const css = String.raw`
@@ -445,6 +446,18 @@
         .rer-button-primary:hover,
         .rer-button-primary:focus-visible {
             background: var(--rer-accent-strong);
+        }
+
+        .rer-button-danger {
+            border-color: rgba(190, 48, 57, 0.34);
+            background: #fff7f7;
+            color: #a12e38;
+        }
+
+        .rer-button-danger:hover,
+        .rer-button-danger:focus-visible {
+            border-color: rgba(190, 48, 57, 0.6);
+            background: #ffeded;
         }
 
         .rer-toolbar .rer-button {
@@ -848,6 +861,16 @@
                         <div class="rer-help">首次自动加载和每次“继续”使用相同数量，范围 1-10 句。</div>
                     </div>
                 </div>
+                <div class="rer-settings-section">
+                    <div class="rer-settings-section-title">数据管理</div>
+                    <div class="rer-setting-row">
+                        <div class="rer-setting-copy">
+                            <div class="rer-setting-name">清除精读缓存</div>
+                            <div class="rer-help">删除已保存的译文、词组和句子主干；不会删除 API 设置。</div>
+                        </div>
+                        <button type="button" class="rer-button rer-button-danger" data-rer-settings="clear-cache">清除</button>
+                    </div>
+                </div>
             </div>
             <div class="rer-settings-footer">
                 <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)} · ${escapeHtml(SCRIPT_RELEASED_AT)}</div>
@@ -877,10 +900,18 @@
         panel.addEventListener('click', (event) => {
             const button = event.target.closest('[data-rer-settings]');
             if (!button) return;
-            if (button.getAttribute('data-rer-settings') === 'cancel') {
+            const action = button.getAttribute('data-rer-settings');
+            if (action === 'cancel') {
                 closeSettings();
                 return;
             }
+            if (action === 'clear-cache') {
+                if (!window.confirm('清除所有已保存的精读结果，并还原当前页面吗？API 设置不会被删除。')) return;
+                clearAnalysisCache();
+                closeSettings();
+                return;
+            }
+            if (action !== 'save') return;
             const nextConfig = {
                 endpoint: cleanEndpoint(endpointInput.value),
                 apiKey: keyInput.value.trim(),
@@ -1189,6 +1220,26 @@
         };
     }
 
+    function clearAnalysisCache() {
+        analysisGeneration += 1;
+        window.clearTimeout(autoAnalyzeTimer);
+        autoAnalyzeQueuedKey = '';
+        autoAnalyzedArticleKey = `${location.origin}${location.pathname}`;
+        analysisCache = {};
+        safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
+
+        for (const item of getConnectedReadingItems()) {
+            item.ready = false;
+            item.loading = false;
+            renderSentenceWithSpans(item.node, item.text, []);
+            item.node.classList.remove('rer-analyzed');
+            item.toggleNode.classList.remove('rer-detail-ready');
+            item.detailNode.innerHTML = '<span class="rer-help">本句精读尚未加载。</span>';
+            setDetailExpanded(item, false);
+        }
+        updateLoadedCount();
+    }
+
     function ensureReady() {
         if (getConfigReady()) return true;
         showSettings();
@@ -1208,6 +1259,7 @@
             updateLoadedCount();
             return;
         }
+        const runGeneration = analysisGeneration;
         analyzeRunning = true;
         setContinueButtonState(true);
         for (const item of pending) {
@@ -1226,6 +1278,7 @@
                 const batch = batches[nextBatch++];
                 try {
                     const results = await analyzeBatchWithFallback(batch);
+                    if (runGeneration !== analysisGeneration) continue;
                     const appliedIds = new Set();
                     for (const result of results) {
                         if (!result || !result.id) continue;
@@ -1234,7 +1287,7 @@
                     for (const item of batch) {
                         if (!appliedIds.has(item.id)) failures.add(item);
                     }
-                    saveAnalysisCache();
+                    if (runGeneration === analysisGeneration) saveAnalysisCache();
                 } catch (error) {
                     for (const item of batch) failures.add(item);
                     console.warn('[Reuters English Reader] Analysis batch failed', error);
@@ -1245,7 +1298,7 @@
         try {
             const workerCount = Math.min(ANALYSIS_CONCURRENCY, batches.length);
             await Promise.all(Array.from({ length: workerCount }, () => worker()));
-            saveAnalysisCache();
+            if (runGeneration === analysisGeneration) saveAnalysisCache();
             if (failures.size) console.info(`[Reuters English Reader] ${failures.size} sentence(s) remain unloaded.`);
         } finally {
             for (const item of pending) {
