@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.1.2
+// @version      1.1.3
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,8 +42,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.1.2';
-    const SCRIPT_RELEASED_AT = '2026-08-19 15:53:01 UTC+8';
+    const SCRIPT_VERSION = '1.1.3';
+    const SCRIPT_RELEASED_AT = '2026-08-19 16:12:34 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -1235,9 +1235,19 @@
     function getChatCompletionsUrl() {
         const endpoint = cleanEndpoint(config.endpoint).replace(/\/+$/, '');
         if (!endpoint) return '';
+        if (/\/responses$/i.test(endpoint)) return endpoint.replace(/\/responses$/i, '/chat/completions');
         if (/\/chat\/completions$/i.test(endpoint)) return endpoint;
         if (/\/v1$/i.test(endpoint)) return `${endpoint}/chat/completions`;
         return `${endpoint}/v1/chat/completions`;
+    }
+
+    function getResponsesUrl() {
+        const endpoint = cleanEndpoint(config.endpoint).replace(/\/+$/, '');
+        if (!endpoint) return '';
+        if (/\/chat\/completions$/i.test(endpoint)) return endpoint.replace(/\/chat\/completions$/i, '/responses');
+        if (/\/responses$/i.test(endpoint)) return endpoint;
+        if (/\/v1$/i.test(endpoint)) return `${endpoint}/responses`;
+        return `${endpoint}/v1/responses`;
     }
 
     function enhancePage() {
@@ -1808,9 +1818,10 @@
             batches.push(pending.slice(index, index + ANALYSIS_BATCH_SIZE));
         }
         let nextBatch = 0;
-        const failures = new Set();
+        const failures = new Map();
+        let fatalError = null;
         const worker = async () => {
-            while (nextBatch < batches.length) {
+            while (!fatalError && nextBatch < batches.length) {
                 const batch = batches[nextBatch++];
                 try {
                     const results = await analyzeBatchWithFallback(batch);
@@ -1821,11 +1832,13 @@
                         if (applyAnalysisResult(result, true)) appliedIds.add(result.id);
                     }
                     for (const item of batch) {
-                        if (!appliedIds.has(item.id)) failures.add(item);
+                        if (!appliedIds.has(item.id)) failures.set(item, '模型返回结果不完整，请重试。');
                     }
                     if (runGeneration === analysisGeneration) saveAnalysisCache();
                 } catch (error) {
-                    for (const item of batch) failures.add(item);
+                    const message = getAnalysisFailureMessage(error);
+                    for (const item of batch) failures.set(item, message);
+                    if (isFatalRequestError(error)) fatalError = error;
                     console.warn('[Google News Navigator] Analysis batch failed', error);
                 }
                 updateLoadedCount();
@@ -1834,15 +1847,22 @@
         try {
             const workerCount = Math.min(ANALYSIS_CONCURRENCY, batches.length);
             await Promise.all(Array.from({ length: workerCount }, () => worker()));
+            if (fatalError) {
+                const message = getAnalysisFailureMessage(fatalError);
+                for (const item of pending) {
+                    if (!item.ready) failures.set(item, message);
+                }
+                queuedFullAnalysis = false;
+                queuedSentenceIds.clear();
+            }
             if (runGeneration === analysisGeneration) saveAnalysisCache();
             if (failures.size) console.info(`[Google News Navigator] ${failures.size} item(s) remain unloaded.`);
         } finally {
             for (const item of pending) {
                 item.loading = false;
                 if (!item.ready) {
-                    renderUnloadedDetail(item, failures.has(item)
-                        ? '加载失败，请重试。'
-                        : (item.kind === 'headline' ? '本标题尚未精读' : '本句尚未精读'));
+                    renderUnloadedDetail(item, failures.get(item)
+                        || (item.kind === 'headline' ? '本标题尚未精读' : '本句尚未精读'));
                 }
                 updateDetailToggleLabel(item);
             }
@@ -2201,6 +2221,22 @@
     }
 
     function requestChatOnce({ system, user }) {
+        const responsesUrl = getResponsesUrl();
+        if (!responsesUrl) return Promise.reject(new Error('API 地址为空。'));
+        const responsesBody = {
+            model: config.model,
+            instructions: system,
+            input: user,
+            reasoning: { effort: REASONING_EFFORT },
+            stream: false
+        };
+        return requestApiOnce(responsesUrl, responsesBody).catch((error) => {
+            if (!['http-404', 'http-405', 'http-501'].includes(error.code)) throw error;
+            return requestChatCompletionsOnce({ system, user });
+        });
+    }
+
+    function requestChatCompletionsOnce({ system, user }) {
         const url = getChatCompletionsUrl();
         if (!url) return Promise.reject(new Error('API 地址为空。'));
         const body = {
@@ -2213,6 +2249,10 @@
             temperature: 0.2,
             stream: false
         };
+        return requestApiOnce(url, body);
+    }
+
+    function requestApiOnce(url, body) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: 'POST',
@@ -2225,18 +2265,14 @@
                 timeout: REQUEST_TIMEOUT_MS,
                 onload: (response) => {
                     if (response.status < 200 || response.status >= 300) {
-                        reject(createRequestError(
-                            `API 请求失败 HTTP ${response.status}: ${String(response.responseText || '').slice(0, 180)}`,
-                            response.status === 408 || response.status === 429 || response.status >= 500,
-                            `http-${response.status}`
-                        ));
+                        reject(createApiResponseError(response));
                         return;
                     }
                     try {
                         const data = JSON.parse(response.responseText || '{}');
-                        const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+                        const content = extractApiResponseContent(data);
                         if (!content) {
-                            reject(new Error('API 响应中没有 message.content。'));
+                            reject(new Error('API 响应中没有可用文本。'));
                             return;
                         }
                         resolve(content.trim());
@@ -2248,6 +2284,55 @@
                 ontimeout: () => reject(createRequestError(`API 请求超过 ${REQUEST_TIMEOUT_MS / 1000} 秒。`, true, 'timeout'))
             });
         });
+    }
+
+    function extractApiResponseContent(data) {
+        const chatContent = data && data.choices && data.choices[0]
+            && data.choices[0].message && data.choices[0].message.content;
+        if (typeof chatContent === 'string' && chatContent.trim()) return chatContent;
+        if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text;
+        if (!Array.isArray(data.output)) return '';
+        return data.output
+            .flatMap((item) => Array.isArray(item && item.content) ? item.content : [])
+            .filter((part) => part && part.type === 'output_text' && typeof part.text === 'string')
+            .map((part) => part.text)
+            .join('\n');
+    }
+
+    function createApiResponseError(response) {
+        const responseText = String(response.responseText || '');
+        let apiMessage = '';
+        try {
+            const parsed = JSON.parse(responseText);
+            apiMessage = String(parsed && parsed.error && (parsed.error.message || parsed.error.code) || '');
+        } catch (_) {
+            apiMessage = responseText;
+        }
+        const unsupportedPromptCache = /prompt_cache_retention/i.test(apiMessage);
+        const code = unsupportedPromptCache ? 'unsupported-prompt-cache' : `http-${response.status}`;
+        const retryable = unsupportedPromptCache
+            || response.status === 408
+            || response.status === 429
+            || response.status >= 500;
+        const message = unsupportedPromptCache
+            ? 'API 网关注入了当前模型不支持的 prompt_cache_retention。'
+            : `API 请求失败 HTTP ${response.status}: ${apiMessage || responseText}`;
+        return createRequestError(message.slice(0, 220), retryable, code);
+    }
+
+    function getAnalysisFailureMessage(error) {
+        if (error && error.code === 'unsupported-prompt-cache') return '接口缓存配置不兼容，请重试或联系网关管理员。';
+        if (error && error.code === 'timeout') return '请求超时，请单独重试本句。';
+        if (error && (error.code === 'http-401' || error.code === 'http-403')) return 'URL 或 Key 无效，请检查设置。';
+        if (error && error.code === 'network') return '网络连接失败，请稍后重试。';
+        return '加载失败，请重试。';
+    }
+
+    function isFatalRequestError(error) {
+        if (!error) return false;
+        if (error.code === 'unsupported-prompt-cache') return true;
+        if (error.retryable) return false;
+        return /^http-(?:400|401|403|404|405|422)$/.test(String(error.code || ''));
     }
 
     function createRequestError(message, retryable, code) {
