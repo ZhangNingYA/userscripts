@@ -5,7 +5,10 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
 
-fetch('./catalog.json')
+const catalogUrl = new URL('./catalog.json', window.location.href);
+catalogUrl.searchParams.set('v', String(Date.now()));
+
+fetch(catalogUrl, { cache: 'no-store' })
   .then((response) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
@@ -21,12 +24,12 @@ fetch('./catalog.json')
         <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
           <p class="script-meta">Userscript <span aria-hidden="true">/</span> v${escapeHtml(script.version)}</p>
-          <h3><a href="scripts/${encodeURIComponent(script.slug)}/">${escapeHtml(script.name)}</a></h3>
+          <h3><a href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
         </div>
         <div class="entry-actions">
-          <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/">Details <span aria-hidden="true">→</span></a>
-          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}">Install</a>
+          <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">Details <span aria-hidden="true">→</span></a>
+          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}?v=${encodeURIComponent(script.version)}">Install</a>
         </div>
       </article>`).join('');
   })

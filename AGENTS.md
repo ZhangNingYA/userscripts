@@ -43,6 +43,8 @@
 - Keep the catalog restrained and readable: compact typography, clear hierarchy, responsive layout, and no decorative oversized headings.
 - Treat userscript metadata as the catalog's source of truth; do not duplicate script records manually.
 - When adding a script, add one directory and one `.user.js` file under `scripts/`; the build tool should discover it automatically.
+- Every userscript addition, update, rename, or removal must be reflected on the published catalog in the same release. Do not treat the script push and website update as separate work.
+- Keep catalog requests cache-safe so a successful Pages deployment is visible immediately. When changing a versioned site asset, also bump its query version in `site/index.html`.
 
 ## Verification
 
@@ -62,3 +64,4 @@
 - Before a requested push, review the diff and run `npm run build` from a clean understanding of the working tree.
 - Use a concise, scoped commit message. Do not mix generated `dist/` files or unrelated changes into the commit.
 - A push to `main` deploys GitHub Pages. After a requested deployment, verify both the catalog and the affected `.user.js` production URL, including the published version metadata.
+- Do not report a userscript release complete until the Pages workflow succeeds and the uncached production homepage/catalog, generated detail page, and install URL all show the same new version. Verify removed scripts are absent from the catalog and return `404` when removal is intentional.

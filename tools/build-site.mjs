@@ -38,6 +38,7 @@ function escapeHtml(value) {
 }
 
 function detailPage(script) {
+  const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const matchRows = script.matches.length
     ? script.matches.map((match) => `<li><code>${escapeHtml(match)}</code></li>`).join('')
     : '<li>No URL patterns declared</li>';
@@ -60,13 +61,13 @@ function detailPage(script) {
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
-          <a class="primary-button" href="./${encodeURIComponent(script.filename)}">Install .user.js</a>
-          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
+          <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install .user.js</a>
+          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
         </div>
       </header>
       <div class="detail-grid">
         <section><h2>Runs on</h2><ul class="match-list">${matchRows}</ul></section>
-        <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
+        <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
         <section><h2>Updates</h2><p>Your userscript manager checks the published version automatically through the script's update URL.</p></section>
       </div>
     </article>
