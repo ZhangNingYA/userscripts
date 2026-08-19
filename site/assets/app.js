@@ -22,20 +22,24 @@ fetch(catalogUrl, { cache: 'no-store' })
     grid.innerHTML = scripts.map((script, index) => {
       const target = script.targets && script.targets[0];
       const extraTargets = Math.max(0, (script.targets?.length || 0) - 1);
+      const detailUrl = `scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}`;
       const targetLink = target
         ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(target.display || target.hostname)}</span>${extraTargets ? `<small>+${extraTargets} sites</small>` : ''}<span aria-hidden="true">↗</span></a>`
         : '';
       return `
       <article class="script-entry">
+        <a class="script-cover" href="${detailUrl}" tabindex="-1" aria-hidden="true">
+          <img src="${escapeHtml(script.cover)}?v=${encodeURIComponent(script.version)}" alt="" width="1200" height="675" loading="lazy" decoding="async">
+        </a>
         <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
           <p class="script-meta">Userscript <span aria-hidden="true">/</span> v${escapeHtml(script.version)}</p>
-          <h3><a href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">${escapeHtml(script.name)}</a></h3>
+          <h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
           ${targetLink}
         </div>
         <div class="entry-actions">
-          <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">Details <span aria-hidden="true">→</span></a>
+          <a class="secondary-link" href="${detailUrl}">Details <span aria-hidden="true">→</span></a>
           <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}?v=${encodeURIComponent(script.version)}">Install</a>
         </div>
       </article>`;
