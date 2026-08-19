@@ -27,8 +27,7 @@ function parseMetadata(source) {
     author: first('author', 'ZhangNingYA'),
     matches: metadata.match || [],
     homepage: first('homepageURL'),
-    support: first('supportURL'),
-    catalogHidden: first('catalog').toLowerCase() === 'hidden'
+    support: first('supportURL')
   };
 }
 
@@ -42,12 +41,6 @@ function detailPage(script) {
   const matchRows = script.matches.length
     ? script.matches.map((match) => `<li><code>${escapeHtml(match)}</code></li>`).join('')
     : '<li>No URL patterns declared</li>';
-  const replacementNotice = script.catalogHidden && script.homepage
-    ? `<p class="detail-lede">This legacy script remains available for existing installations. <a href="${escapeHtml(script.homepage)}">Use Google News Navigator for the unified reader.</a></p>`
-    : '';
-  const primaryAction = script.catalogHidden && script.homepage
-    ? `<a class="primary-button" href="${escapeHtml(script.homepage)}">Open replacement</a>`
-    : `<a class="primary-button" href="./${encodeURIComponent(script.filename)}">Install .user.js</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -66,9 +59,8 @@ function detailPage(script) {
         <p class="section-label">Userscript <span aria-hidden="true">/</span> Version ${escapeHtml(script.version)}</p>
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
-        ${replacementNotice}
         <div class="detail-actions">
-          ${primaryAction}
+          <a class="primary-button" href="./${encodeURIComponent(script.filename)}">Install .user.js</a>
           <a class="text-download" href="./${encodeURIComponent(script.textFilename)}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
         </div>
       </header>
@@ -88,7 +80,6 @@ await rm(outputRoot, { recursive: true, force: true });
 await cp(siteRoot, outputRoot, { recursive: true });
 
 const catalog = [];
-let builtCount = 0;
 const folders = (await readdir(scriptsRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .sort((a, b) => a.name.localeCompare(b.name));
@@ -104,17 +95,13 @@ for (const folder of folders) {
   const metadata = parseMetadata(await readFile(sourceFile, 'utf8'));
   if (!metadata.name || !metadata.version || !metadata.description) throw new Error(`${filename} is missing required metadata`);
   const script = { slug: folder.name, filename, textFilename, ...metadata };
-  builtCount += 1;
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
   await mkdir(targetFolder, { recursive: true });
   await copyFile(sourceFile, path.join(targetFolder, filename));
   await copyFile(sourceFile, path.join(targetFolder, textFilename));
   await writeFile(path.join(targetFolder, 'index.html'), detailPage(script));
-  if (!script.catalogHidden) {
-    const { catalogHidden: _catalogHidden, ...publicScript } = script;
-    catalog.push(publicScript);
-  }
+  catalog.push(script);
 }
 
 await writeFile(path.join(outputRoot, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
-console.log(`Built ${builtCount} userscripts (${catalog.length} in catalog) into ${outputRoot}`);
+console.log(`Built ${catalog.length} userscript${catalog.length === 1 ? '' : 's'} into ${outputRoot}`);

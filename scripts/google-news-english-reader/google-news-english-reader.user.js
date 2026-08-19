@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.0.0
+// @version      1.1.0
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,9 +42,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.0.0';
-    const SCRIPT_RELEASED_AT = '2026-08-19 09:28:28 UTC+8';
-    const ACTIVE_MARKER = 'googleNewsNavigatorActive';
+    const SCRIPT_VERSION = '1.1.0';
+    const SCRIPT_RELEASED_AT = '2026-08-19 11:24:07 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -168,8 +167,6 @@
         complement: '补语'
     };
 
-    document.documentElement.dataset[ACTIVE_MARKER] = SCRIPT_VERSION;
-
     let config = loadConfig();
     let analysisCache = loadAnalysisCache();
     let sentenceCounter = 0;
@@ -180,7 +177,7 @@
     let analyzeRunning = false;
     let autoAnalyzeTimer = 0;
     let autoAnalyzeQueuedKey = '';
-    let autoAnalyzedArticleKey = '';
+    let autoAnalyzedPageKey = '';
     let analysisGeneration = 0;
     let queuedFullAnalysis = false;
     const sentences = new Map();
@@ -637,21 +634,6 @@
             box-shadow: 0 5px 12px rgba(8, 127, 112, 0.2);
         }
 
-        .rer-settings-title {
-            min-width: 0;
-            flex: 1;
-        }
-
-        .rer-settings-eyebrow {
-            margin: 0 0 2px;
-            color: var(--rer-accent-strong);
-            font-size: 9px;
-            font-weight: 850;
-            letter-spacing: 0.12em;
-            line-height: 1.2;
-            text-transform: uppercase;
-        }
-
         .rer-settings-header h2 {
             flex: 1;
             margin: 0;
@@ -835,7 +817,7 @@
         document.documentElement.classList.add('rer-reading-active');
         buildToolbar();
         installInteractionHandlers();
-        enhanceArticle();
+        enhancePage();
         observePageChanges();
         updateLoadedCount();
     }
@@ -998,10 +980,7 @@
         panel.innerHTML = `
             <div class="rer-settings-header">
                 <span class="rer-settings-mark" aria-hidden="true">G</span>
-                <div class="rer-settings-title">
-                    <p class="rer-settings-eyebrow">GOOGLE NEWS NAVIGATOR</p>
-                    <h2>Reading settings</h2>
-                </div>
+                <h2>Google News Navigator</h2>
                 <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
             </div>
             <div class="rer-settings-body">
@@ -1075,7 +1054,7 @@
             buildToolbar();
             updateLoadedCount();
             if (action === 'load-all') {
-                requestFullArticleAnalysis();
+                requestFullPageAnalysis();
                 return;
             }
             if (config.enabled && config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
@@ -1104,22 +1083,21 @@
         return `${endpoint}/v1/chat/completions`;
     }
 
-    function enhanceArticle() {
+    function enhancePage() {
         if (!config.enabled) return;
-        const root = findArticleRoot();
+        const root = findReadingRoot();
         if (!root) {
             updateLoadedCount();
             return;
         }
         const readingElements = collectReadingElements(root);
         let changed = 0;
-        for (const { element, isHeadline, isLinkedTitle, kind } of readingElements) {
+        for (const { element, kind, detailOutside } of readingElements) {
             if (element.dataset.rerReadingElement === 'true') continue;
             const textMap = buildTextMap(element);
             const text = textMap.text;
-            const isTitle = isHeadline || isLinkedTitle;
-            if (!shouldProcessReadingElement(text, element, isTitle)) continue;
-            const parts = isTitle
+            if (!shouldProcessReadingElement(text, element, kind)) continue;
+            const parts = kind === 'headline'
                 ? [{ text, start: 0, end: text.length }]
                 : segmentSentenceRanges(text);
             if (!parts.length) continue;
@@ -1169,7 +1147,7 @@
                 return item;
             });
             for (const item of prepared.slice().reverse()) {
-                insertSentenceControls(item, textMap, isTitle);
+                insertSentenceControls(item, textMap, detailOutside);
             }
             for (const item of prepared) {
                 sentences.set(item.id, item);
@@ -1232,7 +1210,7 @@
         return ranges;
     }
 
-    function insertSentenceControls(item, textMap, isLinkedTitle) {
+    function insertSentenceControls(item, textMap, detailOutside) {
         const point = textMap.positions[item.end - 1];
         if (!point || !point.node.isConnected) return;
         const endingLink = point.node.parentElement && point.node.parentElement.closest('a');
@@ -1240,7 +1218,7 @@
         range.setStart(point.node, point.end);
         range.collapse(true);
         range.insertNode(item.toggleNode);
-        if (isLinkedTitle) {
+        if (detailOutside) {
             item.element.after(item.detailNode);
         } else if (endingLink && item.element.contains(endingLink)) {
             endingLink.after(item.detailNode);
@@ -1249,7 +1227,7 @@
         }
     }
 
-    function findArticleRoot() {
+    function findReadingRoot() {
         if (!isGoogleNewsPage()) {
             const adapter = getSiteAdapter();
             if (!adapter || !adapter.pathPattern.test(location.pathname)) return null;
@@ -1323,7 +1301,7 @@
             const key = text.toLocaleLowerCase('en-US');
             if (seenHeadlines.has(key)) continue;
             seenHeadlines.add(key);
-            elements.push({ element: anchor, isHeadline: false, isLinkedTitle: true, kind: 'headline' });
+            elements.push({ element: anchor, kind: 'headline', detailOutside: true });
         }
         return elements;
     }
@@ -1332,18 +1310,17 @@
         const headline = findHeadline(root);
         const elements = [];
         const seen = new Set();
-        const add = (element, isHeadline = false) => {
+        const add = (element, kind) => {
             if (!element || seen.has(element)) return;
             seen.add(element);
             elements.push({
                 element,
-                isHeadline,
-                isLinkedTitle: false,
-                kind: isHeadline ? 'headline' : 'sentence'
+                kind,
+                detailOutside: kind === 'headline'
             });
         };
-        add(headline, true);
-        for (const paragraph of collectParagraphs(root)) add(paragraph, false);
+        add(headline, 'headline');
+        for (const paragraph of collectParagraphs(root)) add(paragraph, 'sentence');
         return elements;
     }
 
@@ -1406,7 +1383,8 @@
         return rect.width > 0 && rect.height > 0;
     }
 
-    function shouldProcessReadingElement(text, element, isHeadline) {
+    function shouldProcessReadingElement(text, element, kind) {
+        const isHeadline = kind === 'headline';
         const minimumLength = isHeadline ? 12 : 45;
         if (!text || text.length < minimumLength || !/[A-Za-z]/.test(text)) return false;
         if (isGoogleNewsPage()) {
@@ -1459,7 +1437,7 @@
         const observer = new MutationObserver(() => {
             if (!toolbarRoot || !toolbarRoot.isConnected) buildToolbar();
             window.clearTimeout(timer);
-            timer = window.setTimeout(enhanceArticle, 500);
+            timer = window.setTimeout(enhancePage, 500);
         });
         observer.observe(document.documentElement, { childList: true, subtree: true });
     }
@@ -1554,18 +1532,18 @@
     }
 
     function queueAutoAnalyze() {
-        const articleKey = getReadingPageKey();
-        if (autoAnalyzedArticleKey === articleKey) return;
+        const pageKey = getReadingPageKey();
+        if (autoAnalyzedPageKey === pageKey) return;
         window.clearTimeout(autoAnalyzeTimer);
-        autoAnalyzeQueuedKey = articleKey;
+        autoAnalyzeQueuedKey = pageKey;
         autoAnalyzeTimer = window.setTimeout(() => {
-            if (autoAnalyzeQueuedKey !== articleKey
-                || articleKey !== getReadingPageKey()
+            if (autoAnalyzeQueuedKey !== pageKey
+                || pageKey !== getReadingPageKey()
                 || !config.enabled
                 || !config.autoAnalyze
                 || !getConfigReady()) return;
             autoAnalyzeQueuedKey = '';
-            autoAnalyzedArticleKey = articleKey;
+            autoAnalyzedPageKey = pageKey;
             analyzeSentences({ automatic: true });
         }, 700);
     }
@@ -1610,7 +1588,7 @@
         analysisGeneration += 1;
         window.clearTimeout(autoAnalyzeTimer);
         autoAnalyzeQueuedKey = '';
-        autoAnalyzedArticleKey = getReadingPageKey();
+        autoAnalyzedPageKey = getReadingPageKey();
         queuedFullAnalysis = false;
         queuedSentenceIds.clear();
         analysisCache = {};
@@ -1644,7 +1622,7 @@
             return;
         }
         if (!ensureReady()) return;
-        enhanceArticle();
+        enhancePage();
         const ordered = getConnectedReadingItems();
         const requestedItems = Array.isArray(options.items) ? new Set(options.items) : null;
         const candidates = requestedItems
@@ -1752,9 +1730,9 @@
         if (items.length) analyzeSentences({ items });
     }
 
-    function requestFullArticleAnalysis() {
+    function requestFullPageAnalysis() {
         if (!config.enabled || !ensureReady()) return;
-        enhanceArticle();
+        enhancePage();
         const remaining = getConnectedReadingItems().filter((item) => !item.ready).length;
         const unit = isGoogleNewsPage() ? '条新闻标题' : '句';
         if (!remaining) {
