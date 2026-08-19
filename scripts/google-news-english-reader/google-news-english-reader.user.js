@@ -1,18 +1,35 @@
 // ==UserScript==
-// @name         Google News English Reader
-// @name:zh-CN   Google News 英文精读助手
-// @name:en      Google News English Reader
+// @name         Google News Navigator
+// @name:zh-CN   Google News 导航
+// @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.1
-// @description  Cached Google News headline reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
-// @description:zh-CN 为 Google News 英文标题自动缓存译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
-// @description:en Cached Google News headline reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
+// @version      1.0.0
+// @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
+// @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
+// @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @author       ZhangNingYA
 // @homepageURL  https://scripts.fulafu.com/scripts/google-news-english-reader/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
 // @updateURL    https://scripts.fulafu.com/scripts/google-news-english-reader/google-news-english-reader.user.js
 // @downloadURL  https://scripts.fulafu.com/scripts/google-news-english-reader/google-news-english-reader.user.js
 // @match        https://news.google.com/*
+// @match        https://www.reuters.com/*
+// @match        https://reuters.com/*
+// @match        https://apnews.com/*
+// @match        https://www.bbc.com/*
+// @match        https://bbc.com/*
+// @match        https://www.bbc.co.uk/*
+// @match        https://bbc.co.uk/*
+// @match        https://www.cnn.com/*
+// @match        https://cnn.com/*
+// @match        https://edition.cnn.com/*
+// @match        https://www.theguardian.com/*
+// @match        https://www.nytimes.com/*
+// @match        https://www.washingtonpost.com/*
+// @match        https://www.cnbc.com/*
+// @match        https://www.nbcnews.com/*
+// @match        https://www.cbsnews.com/*
+// @match        https://www.foxnews.com/*
 // @run-at       document-idle
 // @grant        GM_addStyle
 // @grant        GM_getValue
@@ -25,8 +42,9 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.1';
-    const SCRIPT_RELEASED_AT = '2026-08-19 09:17:41 UTC+8';
+    const SCRIPT_VERSION = '1.0.0';
+    const SCRIPT_RELEASED_AT = '2026-08-19 09:28:28 UTC+8';
+    const ACTIVE_MARKER = 'googleNewsNavigatorActive';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -49,6 +67,94 @@
         sentencesPerLoad: 5,
         targetLanguage: 'Simplified Chinese'
     };
+    const SITE_ADAPTERS = [
+        {
+            id: 'reuters',
+            name: 'Reuters',
+            hosts: ['reuters.com'],
+            pathPattern: /^\/(world|business|markets|technology|legal|sustainability|sports|lifestyle|breakingviews|graphics)\//,
+            rootSelectors: ['article[data-testid*="article" i]', 'article', 'main [data-testid*="ArticleBody" i]', 'main [data-testid*="article-body" i]']
+        },
+        {
+            id: 'ap',
+            name: 'AP News',
+            hosts: ['apnews.com'],
+            pathPattern: /^\/article\//,
+            rootSelectors: ['[class*="RichTextStoryBody"]', '[class*="Page-storyBody"]', '[data-key="article"]']
+        },
+        {
+            id: 'bbc',
+            name: 'BBC News',
+            hosts: ['bbc.com', 'bbc.co.uk'],
+            pathPattern: /^\/news\/(articles\/|[^/]+-\d+)/,
+            rootSelectors: ['main article', 'article']
+        },
+        {
+            id: 'cnn',
+            name: 'CNN',
+            hosts: ['cnn.com'],
+            pathPattern: /^\/\d{4}\/\d{2}\/\d{2}\//,
+            rootSelectors: ['.article__content', '[data-component-name="article"]', 'article']
+        },
+        {
+            id: 'guardian',
+            name: 'The Guardian',
+            hosts: ['theguardian.com'],
+            pathPattern: /^\/[^/]+\/\d{4}\/[a-z]{3}\/[0-3]?\d\//i,
+            rootSelectors: ['#article article', 'main article', 'article']
+        },
+        {
+            id: 'nyt',
+            name: 'The New York Times',
+            hosts: ['nytimes.com'],
+            pathPattern: /^\/\d{4}\/\d{2}\/\d{2}\//,
+            rootSelectors: ['section[name="articleBody"]', 'article#story', 'main article', 'article']
+        },
+        {
+            id: 'wapo',
+            name: 'The Washington Post',
+            hosts: ['washingtonpost.com'],
+            pathPattern: /^\/[^/]+\/\d{4}\/\d{2}\/\d{2}\//,
+            rootSelectors: ['[data-qa="article-body"]', '[data-qa="article"]', 'main article', 'article']
+        },
+        {
+            id: 'cnbc',
+            name: 'CNBC',
+            hosts: ['cnbc.com'],
+            pathPattern: /^\/\d{4}\/\d{2}\/\d{2}\//,
+            rootSelectors: ['.ArticleBody-articleBody', '[id*="ArticleBody"]', 'main article', 'article']
+        },
+        {
+            id: 'nbc',
+            name: 'NBC News',
+            hosts: ['nbcnews.com'],
+            pathPattern: /-rcna\d+\/?$/,
+            rootSelectors: ['.article-body__content', '.article-body', 'main article', 'article']
+        },
+        {
+            id: 'cbs',
+            name: 'CBS News',
+            hosts: ['cbsnews.com'],
+            pathPattern: /^\/news\/[^/]+\/?$/,
+            rootSelectors: ['#article-0', '.content__body', 'article.content-article', 'article']
+        },
+        {
+            id: 'fox',
+            name: 'Fox News',
+            hosts: ['foxnews.com'],
+            pathPattern: /^\/(politics|us|world|media|tech|health|science|sports|entertainment|lifestyle|travel|food-drink|auto)\/[^/]+\/?$/,
+            rootSelectors: ['.article-body', 'main article', 'article']
+        }
+    ];
+    const REJECTED_CONTENT_SELECTOR = [
+        '.rer-toolbar', '.rer-settings', 'nav', 'footer', 'aside', 'form', 'button',
+        'figure', 'figcaption', '[role="navigation"]', '[aria-hidden="true"]',
+        '[class*="caption" i]', '[class*="copyright" i]', '[class*="footer" i]',
+        '[class*="legal" i]', '[class*="newsletter" i]', '[class*="promo" i]',
+        '[class*="recommend" i]', '[class*="related" i]', '[class*="share" i]',
+        '[class*="subscribe" i]', '[class*="timestamp" i]', '[class*="byline" i]',
+        '[class*="author" i]', '[class*="metadata" i]'
+    ].join(',');
     const ROLE_CLASS = {
         subject: 'rer-role-subject',
         predicate: 'rer-role-predicate',
@@ -61,6 +167,8 @@
         object: '宾语',
         complement: '补语'
     };
+
+    document.documentElement.dataset[ACTIVE_MARKER] = SCRIPT_VERSION;
 
     let config = loadConfig();
     let analysisCache = loadAnalysisCache();
@@ -741,7 +849,7 @@
                 return;
             }
         } catch (error) {
-            console.warn('[Google News English Reader] Failed to inject styles through the userscript manager', error);
+            console.warn('[Google News Navigator] Failed to inject styles through the userscript manager', error);
         }
         const style = document.createElement('style');
         style.dataset.gnerStyles = 'true';
@@ -803,7 +911,7 @@
         try {
             return GM_getValue(key, fallback);
         } catch (error) {
-            console.warn('[Google News English Reader] Failed to read storage', error);
+            console.warn('[Google News Navigator] Failed to read storage', error);
             return fallback;
         }
     }
@@ -812,7 +920,7 @@
         try {
             GM_setValue(key, value);
         } catch (error) {
-            console.warn('[Google News English Reader] Failed to save storage', error);
+            console.warn('[Google News Navigator] Failed to save storage', error);
         }
     }
 
@@ -824,9 +932,9 @@
         if (!toolbarRoot) {
             toolbarRoot = document.createElement('section');
             toolbarRoot.className = 'rer-toolbar';
-            toolbarRoot.setAttribute('aria-label', 'Google News English Reader');
+            toolbarRoot.setAttribute('aria-label', 'Google News Navigator');
             toolbarRoot.innerHTML = `
-                <span class="rer-status" data-rer-status aria-live="polite">0 条</span>
+                <span class="rer-status" data-rer-status aria-live="polite">0</span>
                 <div class="rer-toolbar-actions">
                     <button type="button" class="rer-button rer-button-primary rer-icon-button" data-rer-action="continue" aria-label="继续加载" title="继续加载">
                         <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -869,13 +977,13 @@
 
     function updateLoadedCount() {
         const ready = getConnectedReadingItems().filter((item) => item.ready).length;
-        if (statusNode) statusNode.textContent = `${ready} 条`;
+        if (statusNode) statusNode.textContent = String(ready);
     }
 
     function registerMenu() {
         if (typeof GM_registerMenuCommand !== 'function') return;
-        GM_registerMenuCommand('Google News Reader: 设置', showSettings);
-        GM_registerMenuCommand('Google News Reader: 继续精读', () => analyzeSentences());
+        GM_registerMenuCommand('Google News Navigator: 设置', showSettings);
+        GM_registerMenuCommand('Google News Navigator: 继续精读', () => analyzeSentences());
     }
 
     function showSettings() {
@@ -886,13 +994,13 @@
         panel.className = 'rer-settings';
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');
-        panel.setAttribute('aria-label', 'Google News English Reader settings');
+        panel.setAttribute('aria-label', 'Google News Navigator settings');
         panel.innerHTML = `
             <div class="rer-settings-header">
                 <span class="rer-settings-mark" aria-hidden="true">G</span>
                 <div class="rer-settings-title">
-                    <p class="rer-settings-eyebrow">GOOGLE NEWS READER</p>
-                    <h2>Reader settings</h2>
+                    <p class="rer-settings-eyebrow">GOOGLE NEWS NAVIGATOR</p>
+                    <h2>Reading settings</h2>
                 </div>
                 <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
             </div>
@@ -1005,7 +1113,7 @@
         }
         const readingElements = collectReadingElements(root);
         let changed = 0;
-        for (const { element, isHeadline, isLinkedTitle } of readingElements) {
+        for (const { element, isHeadline, isLinkedTitle, kind } of readingElements) {
             if (element.dataset.rerReadingElement === 'true') continue;
             const textMap = buildTextMap(element);
             const text = textMap.text;
@@ -1025,8 +1133,8 @@
                 toggleNode.setAttribute('role', 'button');
                 toggleNode.setAttribute('tabindex', '0');
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
-                toggleNode.setAttribute('aria-label', '查看本标题精读');
-                toggleNode.title = '查看本标题精读';
+                toggleNode.setAttribute('aria-label', kind === 'headline' ? '查看本标题精读' : '查看本句精读');
+                toggleNode.title = kind === 'headline' ? '查看本标题精读' : '查看本句精读';
                 toggleNode.innerHTML = `
                     <svg class="rer-translation-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                         <path d="m5 8 6 6"></path>
@@ -1047,6 +1155,7 @@
                     start: part.start,
                     end: part.end,
                     order: sentenceCounter,
+                    kind,
                     element,
                     toggleNode,
                     detailNode,
@@ -1060,7 +1169,7 @@
                 return item;
             });
             for (const item of prepared.slice().reverse()) {
-                insertSentenceControls(item, textMap, isLinkedTitle);
+                insertSentenceControls(item, textMap, isTitle);
             }
             for (const item of prepared) {
                 sentences.set(item.id, item);
@@ -1141,6 +1250,50 @@
     }
 
     function findArticleRoot() {
+        if (!isGoogleNewsPage()) {
+            const adapter = getSiteAdapter();
+            if (!adapter || !adapter.pathPattern.test(location.pathname)) return null;
+            return findBestArticleRoot(adapter.rootSelectors)
+                || findBestArticleRoot(['main article', 'article', 'main']);
+        }
+        return findGoogleNewsRoot();
+    }
+
+    function isGoogleNewsPage() {
+        return location.hostname.toLowerCase() === 'news.google.com';
+    }
+
+    function getSiteAdapter() {
+        const hostname = location.hostname.toLowerCase().replace(/^www\./, '');
+        return SITE_ADAPTERS.find((adapter) => adapter.hosts.some((host) => (
+            hostname === host || hostname.endsWith(`.${host}`)
+        ))) || null;
+    }
+
+    function findBestArticleRoot(selectors) {
+        const candidates = [];
+        const seen = new Set();
+        for (const selector of selectors) {
+            for (const node of document.querySelectorAll(selector)) {
+                if (!(node instanceof HTMLElement) || seen.has(node)) continue;
+                seen.add(node);
+                candidates.push(node);
+            }
+        }
+        const ranked = candidates
+            .map((node) => {
+                const paragraphs = Array.from(node.querySelectorAll('p')).filter(isLikelyBodyParagraph);
+                const textLength = paragraphs.reduce((total, paragraph) => (
+                    total + normalizeReadingText(paragraph.textContent).length
+                ), 0);
+                return { node, paragraphCount: paragraphs.length, score: textLength + paragraphs.length * 40 };
+            })
+            .filter((candidate) => candidate.paragraphCount > 0 && candidate.score >= 120)
+            .sort((left, right) => right.score - left.score);
+        return ranked[0] ? ranked[0].node : null;
+    }
+
+    function findGoogleNewsRoot() {
         const candidates = Array.from(document.querySelectorAll('main, [role="main"]'))
             .filter((element, index, elements) => elements.indexOf(element) === index)
             .map((element) => ({
@@ -1157,6 +1310,11 @@
     }
 
     function collectReadingElements(root) {
+        if (!isGoogleNewsPage()) return collectArticleReadingElements(root);
+        return collectGoogleNewsHeadlines(root);
+    }
+
+    function collectGoogleNewsHeadlines(root) {
         const elements = [];
         const seenHeadlines = new Set();
         for (const anchor of root.querySelectorAll('a[href]')) {
@@ -1165,9 +1323,70 @@
             const key = text.toLocaleLowerCase('en-US');
             if (seenHeadlines.has(key)) continue;
             seenHeadlines.add(key);
-            elements.push({ element: anchor, isHeadline: false, isLinkedTitle: true });
+            elements.push({ element: anchor, isHeadline: false, isLinkedTitle: true, kind: 'headline' });
         }
         return elements;
+    }
+
+    function collectArticleReadingElements(root) {
+        const headline = findHeadline(root);
+        const elements = [];
+        const seen = new Set();
+        const add = (element, isHeadline = false) => {
+            if (!element || seen.has(element)) return;
+            seen.add(element);
+            elements.push({
+                element,
+                isHeadline,
+                isLinkedTitle: false,
+                kind: isHeadline ? 'headline' : 'sentence'
+            });
+        };
+        add(headline, true);
+        for (const paragraph of collectParagraphs(root)) add(paragraph, false);
+        return elements;
+    }
+
+    function findHeadline(root) {
+        const candidates = [
+            root.matches('h1') ? root : null,
+            root.querySelector('h1'),
+            document.querySelector('main h1'),
+            document.querySelector('h1[data-testid*="heading" i]'),
+            document.querySelector('article h1'),
+            document.querySelector('h1')
+        ];
+        return candidates.find((node) => {
+            if (!(node instanceof HTMLElement)) return false;
+            const text = normalizeReadingText(node.textContent);
+            if (text.length < 12 || !/[A-Za-z]/.test(text)) return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 || rect.height > 0;
+        }) || null;
+    }
+
+    function collectParagraphs(root) {
+        const unique = [];
+        const seen = new Set();
+        for (const node of root.querySelectorAll('p')) {
+            if (!(node instanceof HTMLElement) || seen.has(node) || !isLikelyBodyParagraph(node)) continue;
+            seen.add(node);
+            unique.push(node);
+        }
+        return unique;
+    }
+
+    function isLikelyBodyParagraph(element) {
+        if (!(element instanceof HTMLElement) || element.closest(REJECTED_CONTENT_SELECTOR)) return false;
+        if (element.querySelector('time, button, input, textarea, select')) return false;
+        const text = normalizeReadingText(element.textContent);
+        if (text.length < 45 || !/[A-Za-z]/.test(text)) return false;
+        if ((text.match(/[A-Za-z]+/g) || []).length < 7) return false;
+        if (/^(copyright|all rights reserved|click here|read more|sign up|subscribe|reporting by|editing by|this material may not)\b/i.test(text)) {
+            return false;
+        }
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 || rect.height > 0;
     }
 
     function isGoogleNewsHeadline(anchor) {
@@ -1190,8 +1409,14 @@
     function shouldProcessReadingElement(text, element, isHeadline) {
         const minimumLength = isHeadline ? 12 : 45;
         if (!text || text.length < minimumLength || !/[A-Za-z]/.test(text)) return false;
-        if (element.closest('.rer-toolbar, .rer-settings, header, nav, footer, aside, form, button')) return false;
-        if (element.querySelector('time, button, input, textarea, select')) return false;
+        if (isGoogleNewsPage()) {
+            if (element.closest('.rer-toolbar, .rer-settings, header, nav, footer, aside, form, button')) return false;
+            if (element.querySelector('time, button, input, textarea, select')) return false;
+        } else if (isHeadline) {
+            if (element.closest('.rer-toolbar, .rer-settings, nav, footer, aside, form, button')) return false;
+        } else if (!isLikelyBodyParagraph(element)) {
+            return false;
+        }
         const rect = element.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return false;
         return !/^(our standards|click here|sign up|reporting by|editing by)\b/i.test(text);
@@ -1300,7 +1525,7 @@
                     range.setEnd(end.node, end.end);
                     rangesByRole[span.role].push(range);
                 } catch (error) {
-                    console.warn('[Google News English Reader] Failed to map structure highlight', error);
+                    console.warn('[Google News Navigator] Failed to map structure highlight', error);
                 }
             }
         }
@@ -1312,16 +1537,17 @@
 
     function updateDetailToggleLabel(item) {
         const expanded = item.toggleNode.getAttribute('aria-expanded') === 'true';
-        let message = '查看本标题精读';
+        const noun = item.kind === 'headline' ? '标题' : '句';
+        let message = `查看本${noun}精读`;
         item.toggleNode.dataset.rerLoading = String(Boolean(item.loading || item.queued));
         if (item.ready) {
-            message = expanded ? '收起本标题精读' : '查看本标题精读';
+            message = expanded ? `收起本${noun}精读` : `查看本${noun}精读`;
         } else if (item.loading) {
             message = '精读加载中';
         } else if (item.queued) {
-            message = '本标题等待加载';
+            message = `本${noun}等待加载`;
         } else {
-            message = '本标题精读尚未加载';
+            message = `本${noun}精读尚未加载`;
         }
         item.toggleNode.setAttribute('aria-label', message);
         item.toggleNode.title = message;
@@ -1441,7 +1667,7 @@
             item.queued = false;
             queuedSentenceIds.delete(item.id);
             item.loading = true;
-            setDetailMessage(item, '正在后台准备标题精读...');
+            setDetailMessage(item, item.kind === 'headline' ? '正在后台准备标题精读...' : '正在后台准备本句精读...');
             updateDetailToggleLabel(item);
         }
         const batches = [];
@@ -1467,7 +1693,7 @@
                     if (runGeneration === analysisGeneration) saveAnalysisCache();
                 } catch (error) {
                     for (const item of batch) failures.add(item);
-                    console.warn('[Google News English Reader] Analysis batch failed', error);
+                    console.warn('[Google News Navigator] Analysis batch failed', error);
                 }
                 updateLoadedCount();
             }
@@ -1476,12 +1702,14 @@
             const workerCount = Math.min(ANALYSIS_CONCURRENCY, batches.length);
             await Promise.all(Array.from({ length: workerCount }, () => worker()));
             if (runGeneration === analysisGeneration) saveAnalysisCache();
-            if (failures.size) console.info(`[Google News English Reader] ${failures.size} headline(s) remain unloaded.`);
+            if (failures.size) console.info(`[Google News Navigator] ${failures.size} item(s) remain unloaded.`);
         } finally {
             for (const item of pending) {
                 item.loading = false;
                 if (!item.ready) {
-                    renderUnloadedDetail(item, failures.has(item) ? '加载失败，请重试。' : '本标题尚未精读');
+                    renderUnloadedDetail(item, failures.has(item)
+                        ? '加载失败，请重试。'
+                        : (item.kind === 'headline' ? '本标题尚未精读' : '本句尚未精读'));
                 }
                 updateDetailToggleLabel(item);
             }
@@ -1528,11 +1756,12 @@
         if (!config.enabled || !ensureReady()) return;
         enhanceArticle();
         const remaining = getConnectedReadingItems().filter((item) => !item.ready).length;
+        const unit = isGoogleNewsPage() ? '条新闻标题' : '句';
         if (!remaining) {
-            window.alert('当前页面标题已经全部加载。');
+            window.alert('当前页面已经全部加载。');
             return;
         }
-        if (!window.confirm(`将分析当前页面尚未完成的 ${remaining} 条新闻标题，可能产生较多 API 请求。继续吗？`)) return;
+        if (!window.confirm(`将分析当前页面尚未完成的 ${remaining} ${unit}，可能产生较多 API 请求。继续吗？`)) return;
         analyzeSentences({ all: true });
     }
 
@@ -1565,7 +1794,7 @@
         const payload = batch.map(({ id, text }) => ({ id, text }));
         const response = await requestChat({
             system: [
-                'You create concise Chinese reading notes for Google News English headlines.',
+                'You create concise Chinese reading notes for English news headlines and article sentences.',
                 'Return JSON only, without markdown.',
                 'For each sentence return id, translation, phrases, pattern, and spans.',
                 'phrases contains 1 to 3 difficult or important phrases as {text, meaning}.',
@@ -1631,7 +1860,7 @@
         try {
             renderSentenceDetail(item, normalized);
         } catch (error) {
-            console.warn('[Google News English Reader] Failed to render headline analysis', error);
+            console.warn('[Google News Navigator] Failed to render reading analysis', error);
             return false;
         }
         if (!item.detailNode.textContent.includes(translation)) return false;
@@ -1802,13 +2031,15 @@
         item.detailNode.innerHTML = `<span class="rer-help">${escapeHtml(message)}</span>`;
     }
 
-    function renderUnloadedDetail(item, message = '本标题尚未精读') {
+    function renderUnloadedDetail(item, message = '') {
         if (item.ready) return;
+        const isHeadline = item.kind === 'headline';
+        const emptyMessage = message || (isHeadline ? '本标题尚未精读' : '本句尚未精读');
         item.detailNode.innerHTML = `
             <span class="rer-detail-empty">
-                <span class="rer-detail-empty-copy">${escapeHtml(message)}</span>
+                <span class="rer-detail-empty-copy">${escapeHtml(emptyMessage)}</span>
                 <span class="rer-detail-actions">
-                    <button type="button" class="rer-button rer-button-primary" data-rer-sentence-action="load-one" data-rer-sentence-id="${escapeHtml(item.id)}">精读标题</button>
+                    <button type="button" class="rer-button rer-button-primary" data-rer-sentence-action="load-one" data-rer-sentence-id="${escapeHtml(item.id)}">${isHeadline ? '精读标题' : '精读本句'}</button>
                 </span>
             </span>
         `;

@@ -3,15 +3,16 @@
 // @name:zh-CN   Reuters 英文精读助手
 // @name:en      Reuters English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.10.1
+// @version      0.10.2
 // @description  Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Reuters 英文新闻自动缓存逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence Reuters reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @author       ZhangNingYA
-// @homepageURL  https://scripts.fulafu.com/scripts/reuters-english-reader/
+// @homepageURL  https://scripts.fulafu.com/scripts/google-news-english-reader/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
 // @updateURL    https://scripts.fulafu.com/scripts/reuters-english-reader/reuters-english-reader.user.js
 // @downloadURL  https://scripts.fulafu.com/scripts/reuters-english-reader/reuters-english-reader.user.js
+// @catalog      hidden
 // @match        https://www.reuters.com/*
 // @match        https://reuters.com/*
 // @run-at       document-idle
@@ -26,8 +27,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.10.1';
-    const SCRIPT_RELEASED_AT = '2026-08-18 21:27:18 UTC+8';
+    const SCRIPT_VERSION = '0.10.2';
+    const SCRIPT_RELEASED_AT = '2026-08-19 09:28:28 UTC+8';
     const CONFIG_KEY = 'reuters-english-reader-config-v2';
     const LEGACY_CONFIG_KEY = 'reuters-english-reader-config-v1';
     const ANALYSIS_CACHE_KEY = 'reuters-english-reader-analysis-v3';
@@ -718,6 +719,7 @@
     `;
 
     function init() {
+        if (document.documentElement.dataset.googleNewsNavigatorActive) return;
         GM_addStyle(css);
         registerMenu();
         if (!config.enabled) return;
@@ -1951,9 +1953,13 @@
         })[character]);
     }
 
+    function startLegacyReader() {
+        window.setTimeout(init, 300);
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init, { once: true });
+        document.addEventListener('DOMContentLoaded', startLegacyReader, { once: true });
     } else {
-        init();
+        startLegacyReader();
     }
 })();

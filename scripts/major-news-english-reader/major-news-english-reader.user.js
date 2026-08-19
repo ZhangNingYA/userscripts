@@ -3,15 +3,16 @@
 // @name:zh-CN   主流英文新闻精读助手
 // @name:en      Major News English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Cached sentence-by-sentence reading for ten major English news publishers with Chinese translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 为十大主流英文新闻网站提供逐句译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached sentence-by-sentence reading for ten major English news publishers with Chinese translations, key phrases, and core grammar highlighting.
 // @author       ZhangNingYA
-// @homepageURL  https://scripts.fulafu.com/scripts/major-news-english-reader/
+// @homepageURL  https://scripts.fulafu.com/scripts/google-news-english-reader/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
 // @updateURL    https://scripts.fulafu.com/scripts/major-news-english-reader/major-news-english-reader.user.js
 // @downloadURL  https://scripts.fulafu.com/scripts/major-news-english-reader/major-news-english-reader.user.js
+// @catalog      hidden
 // @match        https://apnews.com/*
 // @match        https://www.bbc.com/*
 // @match        https://bbc.com/*
@@ -39,8 +40,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 23:02:24 UTC+8';
+    const SCRIPT_VERSION = '0.1.1';
+    const SCRIPT_RELEASED_AT = '2026-08-19 09:28:28 UTC+8';
     const CONFIG_KEY = 'major-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'major-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'major-news-english-reader-analysis-v1';
@@ -812,6 +813,7 @@
     `;
 
     function init() {
+        if (document.documentElement.dataset.googleNewsNavigatorActive) return;
         GM_addStyle(css);
         registerMenu();
         if (!config.enabled) return;
@@ -2050,9 +2052,13 @@
         })[character]);
     }
 
+    function startLegacyReader() {
+        window.setTimeout(init, 300);
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init, { once: true });
+        document.addEventListener('DOMContentLoaded', startLegacyReader, { once: true });
     } else {
-        init();
+        startLegacyReader();
     }
 })();
