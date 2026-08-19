@@ -5,6 +5,18 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
 
+const scriptVisual = (slug, detailUrl) => `
+  <a class="script-visual script-visual-${encodeURIComponent(slug)}" href="${detailUrl}" tabindex="-1" aria-hidden="true">
+    <span class="visual-rail"></span>
+    <span class="visual-line visual-line-one"></span>
+    <span class="visual-line visual-line-two"></span>
+    <span class="visual-line visual-line-three"></span>
+    <span class="visual-tile visual-tile-one"></span>
+    <span class="visual-tile visual-tile-two"></span>
+    <span class="visual-dot visual-dot-one"></span>
+    <span class="visual-dot visual-dot-two"></span>
+  </a>`;
+
 const catalogUrl = new URL('./catalog.json', window.location.href);
 catalogUrl.searchParams.set('v', String(Date.now()));
 
@@ -28,9 +40,7 @@ fetch(catalogUrl, { cache: 'no-store' })
         : '';
       return `
       <article class="script-entry">
-        <a class="script-cover" href="${detailUrl}" tabindex="-1" aria-hidden="true">
-          <img src="${escapeHtml(script.cover)}?v=${encodeURIComponent(script.version)}" alt="" width="1200" height="675" loading="lazy" decoding="async">
-        </a>
+        ${scriptVisual(script.slug, detailUrl)}
         <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
           <p class="script-meta">Userscript <span aria-hidden="true">/</span> v${escapeHtml(script.version)}</p>

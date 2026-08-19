@@ -7,15 +7,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const scriptsRoot = path.join(root, 'scripts');
 const siteRoot = path.join(root, 'site');
 const outputRoot = path.join(root, 'dist');
-const coversRoot = path.join(siteRoot, 'assets', 'covers');
-const coverCredits = JSON.parse(await readFile(path.join(coversRoot, 'credits.json'), 'utf8'));
-const coverFiles = new Map();
-for (const entry of await readdir(coversRoot, { withFileTypes: true })) {
-  if (!entry.isFile() || !/\.(?:avif|jpe?g|png|webp)$/i.test(entry.name)) continue;
-  const slug = entry.name.replace(/\.[^.]+$/, '');
-  if (coverFiles.has(slug)) throw new Error(`${slug} has more than one catalog cover image`);
-  coverFiles.set(slug, entry.name);
-}
 const sitePresentation = new Map([
   ['chatgpt.com', { label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
   ['chat.openai.com', { key: 'chatgpt.com', label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
@@ -95,6 +86,10 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function scriptVisual(slug, className) {
+  return `<div class="${className} script-visual-${escapeHtml(slug)}" aria-hidden="true"><span class="visual-rail"></span><span class="visual-line visual-line-one"></span><span class="visual-line visual-line-two"></span><span class="visual-line visual-line-three"></span><span class="visual-tile visual-tile-one"></span><span class="visual-tile visual-tile-two"></span><span class="visual-dot visual-dot-one"></span><span class="visual-dot visual-dot-two"></span></div>`;
+}
+
 function detailPage(script) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const siteRows = script.targets.length
@@ -104,13 +99,7 @@ function detailPage(script) {
   const primarySiteLink = primaryTarget
     ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(primaryTarget.display)} <span aria-hidden="true">↗</span></a>`
     : '';
-  const coverCredit = script.coverCredit;
-  const coverCreditHtml = coverCredit
-    ? `<figcaption>Image: <a href="${escapeHtml(coverCredit.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(coverCredit.label)}</a>${coverCredit.license && coverCredit.licenseUrl ? ` · <a href="${escapeHtml(coverCredit.licenseUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(coverCredit.license)}</a>` : ''}</figcaption>`
-    : '';
-  const coverHtml = script.cover
-    ? `<figure class="detail-cover detail-cover-${escapeHtml(script.slug)}"><img src="../../${escapeHtml(script.cover)}${versionQuery}" alt="${escapeHtml(script.name)} preview" width="1200" height="675" decoding="async" fetchpriority="high">${coverCreditHtml}</figure>`
-    : '';
+  const detailVisual = scriptVisual(script.slug, 'detail-visual');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -118,7 +107,7 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=9">
+  <link rel="stylesheet" href="../../assets/styles.css?v=10">
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
@@ -135,7 +124,7 @@ function detailPage(script) {
           <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
         </div>
       </header>
-      ${coverHtml}
+      ${detailVisual}
       <div class="detail-grid">
         <section class="runs-on"><div class="section-copy"><h2>Runs on</h2><p>${script.targets.length} supported ${script.targets.length === 1 ? 'site' : 'sites'}</p></div><ul class="site-list">${siteRows}</ul></section>
         <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
@@ -167,10 +156,6 @@ for (const folder of folders) {
   const metadata = parseMetadata(await readFile(sourceFile, 'utf8'));
   if (!metadata.name || !metadata.version || !metadata.description) throw new Error(`${filename} is missing required metadata`);
   const script = { slug: folder.name, filename, textFilename, ...metadata };
-  const coverFilename = coverFiles.get(folder.name);
-  if (!coverFilename) throw new Error(`${folder.name} is missing a catalog cover image`);
-  script.cover = `assets/covers/${coverFilename}`;
-  script.coverCredit = coverCredits[folder.name] || null;
   script.targets = targetsFromMatches(script.matches);
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
   await mkdir(targetFolder, { recursive: true });
