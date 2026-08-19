@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.1.1
+// @version      1.1.2
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,8 +42,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.1.1';
-    const SCRIPT_RELEASED_AT = '2026-08-19 15:13:13 UTC+8';
+    const SCRIPT_VERSION = '1.1.2';
+    const SCRIPT_RELEASED_AT = '2026-08-19 15:53:01 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -189,38 +189,38 @@
 
     const css = String.raw`
         :root {
-            --rer-ink: #172631;
-            --rer-muted: #74818a;
-            --rer-subtle: #a5afb4;
-            --rer-line: rgba(23, 38, 49, 0.12);
-            --rer-accent: #087f70;
-            --rer-accent-strong: #056559;
-            --rer-accent-soft: #e7f3ef;
-            --rer-warm: #b45e36;
-            --rer-panel: #fbfcfb;
-            --rer-soft: #f2f7f5;
-            --rer-shadow: 0 22px 58px rgba(18, 32, 42, 0.2), 0 3px 12px rgba(18, 32, 42, 0.08);
+            --rer-ink: #20242b;
+            --rer-muted: #667085;
+            --rer-subtle: #98a2b3;
+            --rer-line: rgba(32, 36, 43, 0.12);
+            --rer-accent: #2563eb;
+            --rer-accent-strong: #1d4ed8;
+            --rer-accent-soft: #eef5ff;
+            --rer-warm: #b5474f;
+            --rer-panel: #ffffff;
+            --rer-soft: #f6f8fb;
+            --rer-shadow: 0 22px 58px rgba(15, 23, 42, 0.16), 0 3px 12px rgba(15, 23, 42, 0.07);
             --rer-ui-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
         }
 
         ::highlight(rer-role-subject) {
-            background-color: rgba(22, 119, 255, 0.12);
-            text-decoration: underline 2px #1677ff;
+            background-color: rgba(37, 99, 235, 0.11);
+            text-decoration: underline 2px #2563eb;
         }
 
         ::highlight(rer-role-predicate) {
-            background-color: rgba(205, 55, 75, 0.12);
-            text-decoration: underline 2px #cd374b;
+            background-color: rgba(208, 62, 87, 0.1);
+            text-decoration: underline 2px #d03e57;
         }
 
         ::highlight(rer-role-object) {
-            background-color: rgba(21, 128, 61, 0.12);
-            text-decoration: underline 2px #15803d;
+            background-color: rgba(202, 138, 4, 0.12);
+            text-decoration: underline 2px #ca8a04;
         }
 
         ::highlight(rer-role-complement) {
-            background-color: rgba(116, 76, 184, 0.12);
-            text-decoration: underline 2px #744cb8;
+            background-color: rgba(124, 92, 196, 0.11);
+            text-decoration: underline 2px #7c5cc4;
         }
 
         .rer-detail-toggle {
@@ -235,8 +235,8 @@
             padding: 0;
             border: 0;
             border-radius: 6px;
-            background: #eef5f3;
-            color: #5e807a;
+            background: #f1f5fb;
+            color: #64748b;
             cursor: pointer;
             box-shadow: none;
             letter-spacing: 0;
@@ -249,14 +249,14 @@
 
         .rer-detail-toggle:hover,
         .rer-detail-toggle:focus-visible {
-            background: #e2f1ed;
+            background: #e7f0ff;
             color: var(--rer-accent-strong);
             transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(8, 127, 112, 0.14);
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.14);
         }
 
         .rer-detail-toggle:focus-visible {
-            outline: 2px solid rgba(8, 121, 111, 0.28);
+            outline: 2px solid rgba(37, 99, 235, 0.28);
             outline-offset: 1px;
         }
 
@@ -285,12 +285,12 @@
             height: 5px;
             border: 1px solid #ffffff;
             border-radius: 50%;
-            background: #16a36a;
-            box-shadow: 0 0 0 1px rgba(22, 163, 106, 0.14);
+            background: #3b82f6;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.16);
         }
 
         .rer-detail-toggle[aria-expanded="true"] {
-            background: #dff1ec;
+            background: #dfeaff;
             color: var(--rer-accent-strong);
         }
 
@@ -314,10 +314,10 @@
             box-sizing: border-box;
             margin: 0.22em 0 0.54em;
             padding: 0.35em 0.8em 0.76em;
-            border: 1px solid rgba(8, 127, 112, 0.16);
-            border-left: 3px solid rgba(8, 127, 112, 0.62);
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            border-left: 3px solid rgba(37, 99, 235, 0.58);
             border-radius: 0 8px 8px 0;
-            background: #f5faf8;
+            background: #f8fbff;
             color: var(--rer-ink);
             font: 13px/1.58 var(--rer-ui-font);
             letter-spacing: 0;
@@ -361,7 +361,7 @@
             grid-template-columns: 62px minmax(0, 1fr);
             gap: 12px;
             padding: 0.58em 0;
-            border-bottom: 1px solid rgba(23, 38, 49, 0.09);
+            border-bottom: 1px solid rgba(32, 36, 43, 0.09);
         }
 
         .rer-detail-section:last-child {
@@ -430,9 +430,9 @@
             align-items: center;
             min-height: 23px;
             padding: 0 8px;
-            border: 1px solid rgba(8, 127, 112, 0.22);
+            border: 1px solid rgba(37, 99, 235, 0.2);
             border-radius: 6px;
-            background: #e5f3ef;
+            background: #eaf2ff;
             color: var(--rer-accent-strong);
             font-size: 11px;
             font-weight: 800;
@@ -453,13 +453,13 @@
             width: 7px;
             height: 7px;
             border-radius: 999px;
-            background: #8a96a3;
+            background: #98a2b3;
         }
 
-        .rer-role-label[data-role="subject"]::before { background: #1677ff; }
-        .rer-role-label[data-role="predicate"]::before { background: #cd374b; }
-        .rer-role-label[data-role="object"]::before { background: #15803d; }
-        .rer-role-label[data-role="complement"]::before { background: #744cb8; }
+        .rer-role-label[data-role="subject"]::before { background: #2563eb; }
+        .rer-role-label[data-role="predicate"]::before { background: #d03e57; }
+        .rer-role-label[data-role="object"]::before { background: #ca8a04; }
+        .rer-role-label[data-role="complement"]::before { background: #7c5cc4; }
 
         .rer-toolbar,
         .rer-settings {
@@ -481,10 +481,10 @@
             min-height: 42px;
             gap: 5px;
             padding: 4px 5px 4px 10px;
-            border: 1px solid rgba(23, 38, 49, 0.1);
+            border: 1px solid rgba(32, 36, 43, 0.1);
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 10px 28px rgba(18, 32, 42, 0.14), 0 1px 4px rgba(18, 32, 42, 0.07);
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12), 0 1px 4px rgba(15, 23, 42, 0.06);
             backdrop-filter: blur(14px);
             overflow: hidden;
         }
@@ -506,8 +506,8 @@
             height: 5px;
             margin: 0 6px 1px 0;
             border-radius: 50%;
-            background: #1b9a78;
-            box-shadow: 0 0 0 3px rgba(27, 154, 120, 0.1);
+            background: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             vertical-align: middle;
         }
 
@@ -520,7 +520,7 @@
             flex: 0 0 auto;
             gap: 2px;
             padding-left: 4px;
-            border-left: 1px solid rgba(23, 38, 49, 0.08);
+            border-left: 1px solid rgba(32, 36, 43, 0.08);
         }
 
         .rer-button {
@@ -528,9 +528,9 @@
             min-width: 0;
             min-height: 35px;
             padding: 0 11px;
-            border: 1px solid rgba(23, 38, 49, 0.13);
+            border: 1px solid rgba(32, 36, 43, 0.13);
             border-radius: 8px;
-            background: #f4f8f7;
+            background: #f5f7fa;
             color: var(--rer-accent-strong);
             cursor: pointer;
             font: 700 12px/1 var(--rer-ui-font);
@@ -541,8 +541,8 @@
 
         .rer-button:hover,
         .rer-button:focus-visible {
-            background: #e4f2ee;
-            border-color: rgba(8, 127, 112, 0.35);
+            background: #eaf2ff;
+            border-color: rgba(37, 99, 235, 0.34);
             outline: none;
         }
 
@@ -555,7 +555,7 @@
             border-color: var(--rer-accent);
             background: var(--rer-accent);
             color: #ffffff;
-            box-shadow: 0 4px 10px rgba(8, 127, 112, 0.2);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
         }
 
         .rer-button-primary:hover,
@@ -598,18 +598,18 @@
 
         .rer-toolbar .rer-continue-button:hover,
         .rer-toolbar .rer-continue-button:focus-visible {
-            background: #d9eee8;
-            border-color: rgba(8, 127, 112, 0.16);
+            background: #e0ebff;
+            border-color: rgba(37, 99, 235, 0.16);
         }
 
         .rer-toolbar .rer-settings-button {
-            color: #687780;
+            color: #667085;
         }
 
         .rer-toolbar .rer-settings-button:hover,
         .rer-toolbar .rer-settings-button:focus-visible {
             color: var(--rer-ink);
-            background: #eef2f3;
+            background: #f1f4f8;
             border-color: transparent;
         }
 
@@ -635,7 +635,7 @@
             box-sizing: border-box;
             width: 15px;
             height: 15px;
-            border: 2px solid rgba(8, 127, 112, 0.22);
+            border: 2px solid rgba(37, 99, 235, 0.22);
             border-top-color: currentColor;
             border-radius: 50%;
             pointer-events: none;
@@ -663,7 +663,7 @@
             position: fixed;
             inset: 0;
             z-index: 2147483645;
-            background: rgba(17, 29, 37, 0.3);
+            background: rgba(15, 23, 42, 0.26);
             backdrop-filter: blur(2px);
         }
 
@@ -675,7 +675,7 @@
             max-height: calc(100vh - 84px);
             overflow: auto;
             padding: 0;
-            border: 1px solid rgba(23, 38, 49, 0.13);
+            border: 1px solid rgba(32, 36, 43, 0.13);
             border-radius: 14px;
             background: var(--rer-panel);
             box-shadow: var(--rer-shadow);
@@ -687,7 +687,7 @@
             gap: 11px;
             padding: 16px 17px 14px;
             border-bottom: 1px solid var(--rer-line);
-            background: #f3f8f6;
+            background: #f7f9fc;
         }
 
         .rer-settings-mark {
@@ -702,7 +702,7 @@
             font-size: 13px;
             font-weight: 850;
             letter-spacing: -0.02em;
-            box-shadow: 0 5px 12px rgba(8, 127, 112, 0.2);
+            box-shadow: 0 5px 12px rgba(37, 99, 235, 0.2);
         }
 
         .rer-settings-header h2 {
@@ -720,7 +720,7 @@
             height: 30px;
             border: 1px solid transparent;
             border-radius: 8px;
-            background: rgba(23, 38, 49, 0.05);
+            background: rgba(32, 36, 43, 0.05);
             color: var(--rer-muted);
             cursor: pointer;
             font-size: 21px;
@@ -729,8 +729,8 @@
 
         .rer-settings-close:hover,
         .rer-settings-close:focus-visible {
-            border-color: rgba(23, 38, 49, 0.12);
-            background: rgba(23, 38, 49, 0.09);
+            border-color: rgba(32, 36, 43, 0.12);
+            background: rgba(32, 36, 43, 0.09);
             outline: none;
         }
 
@@ -772,7 +772,7 @@
             grid-template-columns: 34px minmax(0, 1fr);
             align-items: center;
             gap: 9px;
-            color: #607078;
+            color: #667085;
             font-size: 10px;
             font-weight: 800;
             letter-spacing: 0.08em;
@@ -784,7 +784,7 @@
             min-width: 0;
             min-height: 39px;
             padding: 8px 11px;
-            border: 1px solid rgba(23, 38, 49, 0.16);
+            border: 1px solid rgba(32, 36, 43, 0.16);
             border-radius: 9px;
             background: #ffffff;
             color: var(--rer-ink);
@@ -793,8 +793,8 @@
         }
 
         .rer-api-row input:focus {
-            border-color: rgba(8, 127, 112, 0.7);
-            outline: 3px solid rgba(8, 127, 112, 0.12);
+            border-color: rgba(37, 99, 235, 0.7);
+            outline: 3px solid rgba(37, 99, 235, 0.12);
         }
 
         .rer-help {
@@ -821,7 +821,7 @@
             width: 62px;
             min-height: 35px;
             padding: 5px 8px;
-            border: 1px solid rgba(23, 38, 49, 0.16);
+            border: 1px solid rgba(32, 36, 43, 0.16);
             border-radius: 8px;
             background: #ffffff;
             color: var(--rer-ink);
@@ -830,8 +830,8 @@
         }
 
         .rer-setting-number:focus {
-            border-color: rgba(8, 127, 112, 0.7);
-            outline: 3px solid rgba(8, 127, 112, 0.12);
+            border-color: rgba(37, 99, 235, 0.7);
+            outline: 3px solid rgba(37, 99, 235, 0.12);
         }
 
         .rer-settings-footer {
@@ -841,7 +841,7 @@
             gap: 12px;
             padding: 12px 17px 14px;
             border-top: 1px solid var(--rer-line);
-            background: #f7faf9;
+            background: #f7f9fc;
         }
 
         .rer-settings-version {
@@ -1012,33 +1012,76 @@
         return Boolean(config.endpoint && config.apiKey && config.model);
     }
 
+    function createUiElement(tagName, options = {}, children = []) {
+        const element = document.createElement(tagName);
+        if (options.className) element.className = options.className;
+        if (Object.prototype.hasOwnProperty.call(options, 'text')) element.textContent = String(options.text ?? '');
+        for (const [name, value] of Object.entries(options.attributes || {})) {
+            if (value !== null && value !== undefined && value !== false) {
+                element.setAttribute(name, String(value));
+            }
+        }
+        element.append(...children.filter((child) => child !== null && child !== undefined));
+        return element;
+    }
+
+    function createSvgIcon(className, shapes) {
+        const namespace = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(namespace, 'svg');
+        svg.setAttribute('class', className);
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        for (const [tagName, attributes] of shapes) {
+            const shape = document.createElementNS(namespace, tagName);
+            for (const [name, value] of Object.entries(attributes)) shape.setAttribute(name, String(value));
+            svg.append(shape);
+        }
+        return svg;
+    }
+
     function buildToolbar() {
         if (!toolbarRoot) {
             toolbarRoot = document.createElement('section');
             toolbarRoot.className = 'rer-toolbar';
             toolbarRoot.setAttribute('aria-label', 'Google News Navigator');
-            toolbarRoot.innerHTML = `
-                <span class="rer-status" data-rer-status aria-live="polite">0</span>
-                <div class="rer-toolbar-actions">
-                    <button type="button" class="rer-button rer-icon-button rer-continue-button" data-rer-action="continue" data-loading="false" aria-label="继续加载" title="继续加载">
-                        <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path d="M12 5v14"></path>
-                            <path d="m19 12-7 7-7-7"></path>
-                        </svg>
-                        <span class="rer-button-spinner" aria-hidden="true"></span>
-                    </button>
-                    <button type="button" class="rer-button rer-icon-button rer-settings-button" data-rer-action="settings" aria-label="设置" title="设置">
-                        <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path d="M20 7h-9"></path>
-                            <path d="M14 17H5"></path>
-                            <circle cx="17" cy="17" r="3"></circle>
-                            <circle cx="7" cy="7" r="3"></circle>
-                        </svg>
-                    </button>
-                </div>
-            `;
-            statusNode = toolbarRoot.querySelector('[data-rer-status]');
+        }
+        if (!toolbarRoot.childElementCount) {
+            statusNode = createUiElement('span', {
+                className: 'rer-status',
+                text: '0',
+                attributes: { 'data-rer-status': '', 'aria-live': 'polite' }
+            });
+            const continueButton = createUiElement('button', {
+                className: 'rer-button rer-icon-button rer-continue-button',
+                attributes: {
+                    type: 'button', 'data-rer-action': 'continue', 'data-loading': 'false',
+                    'aria-label': '继续加载', title: '继续加载'
+                }
+            }, [
+                createSvgIcon('rer-toolbar-icon', [
+                    ['path', { d: 'M12 5v14' }],
+                    ['path', { d: 'm19 12-7 7-7-7' }]
+                ]),
+                createUiElement('span', { className: 'rer-button-spinner', attributes: { 'aria-hidden': 'true' } })
+            ]);
+            const settingsButton = createUiElement('button', {
+                className: 'rer-button rer-icon-button rer-settings-button',
+                attributes: { type: 'button', 'data-rer-action': 'settings', 'aria-label': '设置', title: '设置' }
+            }, [createSvgIcon('rer-toolbar-icon', [
+                ['path', { d: 'M20 7h-9' }],
+                ['path', { d: 'M14 17H5' }],
+                ['circle', { cx: '17', cy: '17', r: '3' }],
+                ['circle', { cx: '7', cy: '7', r: '3' }]
+            ])]);
+            toolbarRoot.replaceChildren(
+                statusNode,
+                createUiElement('div', { className: 'rer-toolbar-actions' }, [continueButton, settingsButton])
+            );
+        }
+        if (toolbarRoot.dataset.listenerInstalled !== 'true') {
             toolbarRoot.addEventListener('click', handleToolbarClick);
+            toolbarRoot.dataset.listenerInstalled = 'true';
         }
         if (!toolbarRoot.isConnected) document.documentElement.append(toolbarRoot);
         updateLoadedCount();
@@ -1075,47 +1118,63 @@
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');
         panel.setAttribute('aria-label', 'Google News Navigator settings');
-        panel.innerHTML = `
-            <div class="rer-settings-header">
-                <span class="rer-settings-mark" aria-hidden="true">G</span>
-                <h2>Google News Navigator</h2>
-                <button type="button" class="rer-settings-close" data-rer-settings="cancel" aria-label="关闭" title="关闭">&times;</button>
-            </div>
-            <div class="rer-settings-body">
-                <div class="rer-settings-command-row">
-                    <button type="button" class="rer-button rer-button-primary rer-load-all-button" data-rer-settings="load-all">Analyze page</button>
-                    <label class="rer-batch-control" for="rer-sentences-per-load">
-                        <span>Batch</span>
-                        <input class="rer-setting-number" id="rer-sentences-per-load" type="number" min="1" max="10" step="1" inputmode="numeric">
-                    </label>
-                </div>
-                <div class="rer-api-fields">
-                    <label class="rer-api-row" for="rer-endpoint">
-                        <span>URL</span>
-                        <input id="rer-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="https://example.com/v1">
-                    </label>
-                    <label class="rer-api-row" for="rer-key">
-                        <span>KEY</span>
-                        <input id="rer-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
-                    </label>
-                </div>
-                <div class="rer-cache-row">
-                    <span>Cache</span>
-                    <button type="button" class="rer-button rer-button-danger" data-rer-settings="clear-cache">Clear</button>
-                </div>
-            </div>
-            <div class="rer-settings-footer">
-                <div class="rer-settings-version">v${escapeHtml(SCRIPT_VERSION)}</div>
-                <button type="button" class="rer-button rer-button-primary" data-rer-settings="save">Save</button>
-            </div>
-        `;
+        const endpointInput = createUiElement('input', { attributes: {
+            id: 'rer-endpoint', type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'https://example.com/v1'
+        } });
+        const keyInput = createUiElement('input', { attributes: {
+            id: 'rer-key', type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: 'sk-...'
+        } });
+        const sentencesPerLoadInput = createUiElement('input', {
+            className: 'rer-setting-number',
+            attributes: { id: 'rer-sentences-per-load', type: 'number', min: '1', max: '10', step: '1', inputmode: 'numeric' }
+        });
+        panel.append(
+            createUiElement('div', { className: 'rer-settings-header' }, [
+                createUiElement('span', { className: 'rer-settings-mark', text: 'G', attributes: { 'aria-hidden': 'true' } }),
+                createUiElement('h2', { text: 'Google News Navigator' }),
+                createUiElement('button', {
+                    className: 'rer-settings-close', text: '\u00d7',
+                    attributes: { type: 'button', 'data-rer-settings': 'cancel', 'aria-label': '关闭', title: '关闭' }
+                })
+            ]),
+            createUiElement('div', { className: 'rer-settings-body' }, [
+                createUiElement('div', { className: 'rer-settings-command-row' }, [
+                    createUiElement('button', {
+                        className: 'rer-button rer-button-primary rer-load-all-button', text: 'Analyze page',
+                        attributes: { type: 'button', 'data-rer-settings': 'load-all' }
+                    }),
+                    createUiElement('label', {
+                        className: 'rer-batch-control', attributes: { for: 'rer-sentences-per-load' }
+                    }, [createUiElement('span', { text: 'Batch' }), sentencesPerLoadInput])
+                ]),
+                createUiElement('div', { className: 'rer-api-fields' }, [
+                    createUiElement('label', { className: 'rer-api-row', attributes: { for: 'rer-endpoint' } }, [
+                        createUiElement('span', { text: 'URL' }), endpointInput
+                    ]),
+                    createUiElement('label', { className: 'rer-api-row', attributes: { for: 'rer-key' } }, [
+                        createUiElement('span', { text: 'KEY' }), keyInput
+                    ])
+                ]),
+                createUiElement('div', { className: 'rer-cache-row' }, [
+                    createUiElement('span', { text: 'Cache' }),
+                    createUiElement('button', {
+                        className: 'rer-button rer-button-danger', text: 'Clear',
+                        attributes: { type: 'button', 'data-rer-settings': 'clear-cache' }
+                    })
+                ])
+            ]),
+            createUiElement('div', { className: 'rer-settings-footer' }, [
+                createUiElement('div', { className: 'rer-settings-version', text: `v${SCRIPT_VERSION}` }),
+                createUiElement('button', {
+                    className: 'rer-button rer-button-primary', text: 'Save',
+                    attributes: { type: 'button', 'data-rer-settings': 'save' }
+                })
+            ])
+        );
         settingsRoot = document.createElement('div');
         settingsRoot.append(backdrop, panel);
         document.documentElement.append(settingsRoot);
 
-        const endpointInput = panel.querySelector('#rer-endpoint');
-        const keyInput = panel.querySelector('#rer-key');
-        const sentencesPerLoadInput = panel.querySelector('#rer-sentences-per-load');
         endpointInput.value = config.endpoint || '';
         keyInput.value = config.apiKey || '';
         sentencesPerLoadInput.value = String(config.sentencesPerLoad);
@@ -1211,16 +1270,14 @@
                 toggleNode.setAttribute('aria-expanded', String(Boolean(config.defaultExpanded)));
                 toggleNode.setAttribute('aria-label', kind === 'headline' ? '查看本标题精读' : '查看本句精读');
                 toggleNode.title = kind === 'headline' ? '查看本标题精读' : '查看本句精读';
-                toggleNode.innerHTML = `
-                    <svg class="rer-translation-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="m5 8 6 6"></path>
-                        <path d="m4 14 6-6 2-3"></path>
-                        <path d="M2 5h12"></path>
-                        <path d="M7 2h1"></path>
-                        <path d="m22 22-5-10-5 10"></path>
-                        <path d="M14 18h6"></path>
-                    </svg>
-                `;
+                toggleNode.append(createSvgIcon('rer-translation-icon', [
+                    ['path', { d: 'm5 8 6 6' }],
+                    ['path', { d: 'm4 14 6-6 2-3' }],
+                    ['path', { d: 'M2 5h12' }],
+                    ['path', { d: 'M7 2h1' }],
+                    ['path', { d: 'm22 22-5-10-5 10' }],
+                    ['path', { d: 'M14 18h6' }]
+                ]));
                 const detailNode = document.createElement('span');
                 detailNode.className = 'rer-detail-panel';
                 detailNode.dataset.rerSentenceDetail = id;
@@ -2071,58 +2128,58 @@
     }
 
     function renderSentenceDetail(item, result) {
-        const phraseHtml = result.phrases.length
-            ? result.phrases.map((phrase) => `
-                <span class="rer-phrase-row">
-                    <span class="rer-phrase-text">${escapeHtml(phrase.text)}</span>
-                    <span class="rer-phrase-meaning">${escapeHtml(phrase.meaning)}</span>
-                </span>
-            `).join('')
-            : '<span class="rer-help">无额外重点词组</span>';
-        const structureHtml = result.structureReliable && result.spans.length
-            ? result.spans.map((span) => `
-                <span class="rer-structure-row">
-                    <span class="rer-role-label" data-role="${escapeHtml(span.role)}">${escapeHtml(ROLE_LABEL[span.role] || span.role)}</span>
-                    <span>${escapeHtml(item.text.slice(span.start, span.end))}</span>
-                </span>
-            `).join('')
-            : '<span class="rer-help">未能可靠定位，已省略结构高亮</span>';
-        item.detailNode.innerHTML = `
-            <span class="rer-detail-section">
-                <span class="rer-detail-heading">译文</span>
-                <span class="rer-detail-content">${escapeHtml(result.translation)}</span>
-            </span>
-            <span class="rer-detail-section">
-                <span class="rer-detail-heading">重点词组</span>
-                <span class="rer-detail-content rer-phrase-list">${phraseHtml}</span>
-            </span>
-            <span class="rer-detail-section">
-                <span class="rer-detail-heading">句子主干</span>
-                <span class="rer-detail-content rer-structure-list">
-                    <span class="rer-pattern-row"><span class="rer-role-label">句型</span><span class="rer-pattern">${escapeHtml(result.pattern)}</span></span>
-                    ${structureHtml}
-                </span>
-            </span>
-        `;
+        const phrases = result.phrases.length
+            ? result.phrases.map((phrase) => createUiElement('span', { className: 'rer-phrase-row' }, [
+                createUiElement('span', { className: 'rer-phrase-text', text: phrase.text }),
+                createUiElement('span', { className: 'rer-phrase-meaning', text: phrase.meaning })
+            ]))
+            : [createUiElement('span', { className: 'rer-help', text: '无额外重点词组' })];
+        const structures = result.structureReliable && result.spans.length
+            ? result.spans.map((span) => createUiElement('span', { className: 'rer-structure-row' }, [
+                createUiElement('span', {
+                    className: 'rer-role-label', text: ROLE_LABEL[span.role] || span.role,
+                    attributes: { 'data-role': span.role }
+                }),
+                createUiElement('span', { text: item.text.slice(span.start, span.end) })
+            ]))
+            : [createUiElement('span', { className: 'rer-help', text: '未能可靠定位，已省略结构高亮' })];
+        const createSection = (heading, content) => createUiElement('span', { className: 'rer-detail-section' }, [
+            createUiElement('span', { className: 'rer-detail-heading', text: heading }),
+            content
+        ]);
+        item.detailNode.replaceChildren(
+            createSection('译文', createUiElement('span', { className: 'rer-detail-content', text: result.translation })),
+            createSection('重点词组', createUiElement('span', { className: 'rer-detail-content rer-phrase-list' }, phrases)),
+            createSection('句子主干', createUiElement('span', { className: 'rer-detail-content rer-structure-list' }, [
+                createUiElement('span', { className: 'rer-pattern-row' }, [
+                    createUiElement('span', { className: 'rer-role-label', text: '句型' }),
+                    createUiElement('span', { className: 'rer-pattern', text: result.pattern })
+                ]),
+                ...structures
+            ]))
+        );
     }
 
     function setDetailMessage(item, message) {
         if (item.ready) return;
-        item.detailNode.innerHTML = `<span class="rer-help">${escapeHtml(message)}</span>`;
+        item.detailNode.replaceChildren(createUiElement('span', { className: 'rer-help', text: message }));
     }
 
     function renderUnloadedDetail(item, message = '') {
         if (item.ready) return;
         const isHeadline = item.kind === 'headline';
         const emptyMessage = message || (isHeadline ? '本标题尚未精读' : '本句尚未精读');
-        item.detailNode.innerHTML = `
-            <span class="rer-detail-empty">
-                <span class="rer-detail-empty-copy">${escapeHtml(emptyMessage)}</span>
-                <span class="rer-detail-actions">
-                    <button type="button" class="rer-button rer-button-primary" data-rer-sentence-action="load-one" data-rer-sentence-id="${escapeHtml(item.id)}">${isHeadline ? '精读标题' : '精读本句'}</button>
-                </span>
-            </span>
-        `;
+        item.detailNode.replaceChildren(createUiElement('span', { className: 'rer-detail-empty' }, [
+            createUiElement('span', { className: 'rer-detail-empty-copy', text: emptyMessage }),
+            createUiElement('span', { className: 'rer-detail-actions' }, [
+                createUiElement('button', {
+                    className: 'rer-button rer-button-primary', text: isHeadline ? '精读标题' : '精读本句',
+                    attributes: {
+                        type: 'button', 'data-rer-sentence-action': 'load-one', 'data-rer-sentence-id': item.id
+                    }
+                })
+            ])
+        ]));
     }
 
     async function requestChat(payload, options = {}) {
@@ -2234,16 +2291,6 @@
             }
             return null;
         }
-    }
-
-    function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>"']/g, (character) => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        })[character]);
     }
 
     if (document.readyState === 'loading') {
