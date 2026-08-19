@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 英文精读助手
 // @name:en      Google News English Reader
 // @namespace    https://scripts.fulafu.com/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Cached Google News headline reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
 // @description:zh-CN 为 Google News 英文标题自动缓存译文、重点词组和精简主谓宾标记，API 信息由使用者本地配置。
 // @description:en Cached Google News headline reading with Chinese translations, key phrases, and concise core grammar highlighting through a user-configured OpenAI-compatible API.
@@ -25,8 +25,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '0.1.0';
-    const SCRIPT_RELEASED_AT = '2026-08-18 22:33:12 UTC+8';
+    const SCRIPT_VERSION = '0.1.1';
+    const SCRIPT_RELEASED_AT = '2026-08-19 09:17:41 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -65,6 +65,7 @@
     let config = loadConfig();
     let analysisCache = loadAnalysisCache();
     let sentenceCounter = 0;
+    let stylesInstalled = false;
     let toolbarRoot = null;
     let settingsRoot = null;
     let statusNode = null;
@@ -720,7 +721,7 @@
     `;
 
     function init() {
-        GM_addStyle(css);
+        installStyles();
         registerMenu();
         if (!config.enabled) return;
         document.documentElement.classList.add('rer-reading-active');
@@ -729,6 +730,24 @@
         enhanceArticle();
         observePageChanges();
         updateLoadedCount();
+    }
+
+    function installStyles() {
+        if (stylesInstalled) return;
+        try {
+            if (typeof GM_addStyle === 'function') {
+                GM_addStyle(css);
+                stylesInstalled = true;
+                return;
+            }
+        } catch (error) {
+            console.warn('[Google News English Reader] Failed to inject styles through the userscript manager', error);
+        }
+        const style = document.createElement('style');
+        style.dataset.gnerStyles = 'true';
+        style.textContent = css;
+        (document.head || document.documentElement).append(style);
+        stylesInstalled = true;
     }
 
     function loadConfig() {
@@ -802,37 +821,38 @@
     }
 
     function buildToolbar() {
-        if (toolbarRoot) return;
-        toolbarRoot = document.createElement('section');
-        toolbarRoot.className = 'rer-toolbar';
-        toolbarRoot.setAttribute('aria-label', 'Google News English Reader');
-        toolbarRoot.innerHTML = `
-            <span class="rer-status" data-rer-status aria-live="polite">0 条</span>
-            <div class="rer-toolbar-actions">
-                <button type="button" class="rer-button rer-button-primary rer-icon-button" data-rer-action="continue" aria-label="继续加载" title="继续加载">
-                    <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="m7 6 5 5 5-5"></path>
-                        <path d="m7 13 5 5 5-5"></path>
-                    </svg>
-                </button>
-                <button type="button" class="rer-button rer-icon-button" data-rer-action="settings" aria-label="设置" title="设置">
-                    <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M21 4h-7"></path>
-                        <path d="M10 4H3"></path>
-                        <path d="M21 12h-9"></path>
-                        <path d="M8 12H3"></path>
-                        <path d="M21 20h-5"></path>
-                        <path d="M12 20H3"></path>
-                        <path d="M14 2v4"></path>
-                        <path d="M8 10v4"></path>
-                        <path d="M16 18v4"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
-        statusNode = toolbarRoot.querySelector('[data-rer-status]');
-        toolbarRoot.addEventListener('click', handleToolbarClick);
-        document.documentElement.append(toolbarRoot);
+        if (!toolbarRoot) {
+            toolbarRoot = document.createElement('section');
+            toolbarRoot.className = 'rer-toolbar';
+            toolbarRoot.setAttribute('aria-label', 'Google News English Reader');
+            toolbarRoot.innerHTML = `
+                <span class="rer-status" data-rer-status aria-live="polite">0 条</span>
+                <div class="rer-toolbar-actions">
+                    <button type="button" class="rer-button rer-button-primary rer-icon-button" data-rer-action="continue" aria-label="继续加载" title="继续加载">
+                        <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="m7 6 5 5 5-5"></path>
+                            <path d="m7 13 5 5 5-5"></path>
+                        </svg>
+                    </button>
+                    <button type="button" class="rer-button rer-icon-button" data-rer-action="settings" aria-label="设置" title="设置">
+                        <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M21 4h-7"></path>
+                            <path d="M10 4H3"></path>
+                            <path d="M21 12h-9"></path>
+                            <path d="M8 12H3"></path>
+                            <path d="M21 20h-5"></path>
+                            <path d="M12 20H3"></path>
+                            <path d="M14 2v4"></path>
+                            <path d="M8 10v4"></path>
+                            <path d="M16 18v4"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            statusNode = toolbarRoot.querySelector('[data-rer-status]');
+            toolbarRoot.addEventListener('click', handleToolbarClick);
+        }
+        if (!toolbarRoot.isConnected) document.documentElement.append(toolbarRoot);
         updateLoadedCount();
     }
 
@@ -1121,9 +1141,19 @@
     }
 
     function findArticleRoot() {
-        const main = document.querySelector('main');
-        if (!main || !main.textContent || main.textContent.trim().length < 80) return null;
-        return main;
+        const candidates = Array.from(document.querySelectorAll('main, [role="main"]'))
+            .filter((element, index, elements) => elements.indexOf(element) === index)
+            .map((element) => ({
+                element,
+                headlineLinks: element.querySelectorAll('a[href*="/read/"], a[href*="/articles/"]').length,
+                textLength: normalizeReadingText(element.textContent).length
+            }))
+            .filter((candidate) => candidate.headlineLinks > 0 && candidate.textLength >= 80)
+            .sort((left, right) => right.headlineLinks - left.headlineLinks || right.textLength - left.textLength);
+        if (candidates[0]) return candidates[0].element;
+        const body = document.body;
+        if (body && body.querySelector('a[href*="/read/"], a[href*="/articles/"]')) return body;
+        return null;
     }
 
     function collectReadingElements(root) {
@@ -1147,7 +1177,7 @@
         } catch (error) {
             return false;
         }
-        if (!pathname.startsWith('/read/')) return false;
+        if (!/^\/(?:read|articles)\//.test(pathname)) return false;
         if (anchor.closest('header, nav, aside, footer, form, [role="navigation"]')) return false;
         const text = normalizeReadingText(anchor.textContent);
         if (text.length < 18 || text.length > 320 || !/[A-Za-z]/.test(text)) return false;
@@ -1202,6 +1232,7 @@
     function observePageChanges() {
         let timer = 0;
         const observer = new MutationObserver(() => {
+            if (!toolbarRoot || !toolbarRoot.isConnected) buildToolbar();
             window.clearTimeout(timer);
             timer = window.setTimeout(enhanceArticle, 500);
         });
