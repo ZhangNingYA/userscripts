@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.1.0
+// @version      1.1.1
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,8 +42,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.1.0';
-    const SCRIPT_RELEASED_AT = '2026-08-19 11:24:07 UTC+8';
+    const SCRIPT_VERSION = '1.1.1';
+    const SCRIPT_RELEASED_AT = '2026-08-19 15:13:13 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -180,6 +180,10 @@
     let autoAnalyzedPageKey = '';
     let analysisGeneration = 0;
     let queuedFullAnalysis = false;
+    let initAttempts = 0;
+    let interactionHandlersInstalled = false;
+    let menuRegistered = false;
+    let pageObserverInstalled = false;
     const sentences = new Map();
     const queuedSentenceIds = new Set();
 
@@ -191,6 +195,7 @@
             --rer-line: rgba(23, 38, 49, 0.12);
             --rer-accent: #087f70;
             --rer-accent-strong: #056559;
+            --rer-accent-soft: #e7f3ef;
             --rer-warm: #b45e36;
             --rer-panel: #fbfcfb;
             --rer-soft: #f2f7f5;
@@ -473,20 +478,20 @@
             align-items: center;
             width: auto;
             max-width: calc(100vw - 24px);
-            min-height: 46px;
-            gap: 7px;
-            padding: 6px 7px 6px 10px;
-            border: 1px solid rgba(23, 38, 49, 0.12);
-            border-radius: 14px;
-            background: rgba(251, 252, 251, 0.96);
-            box-shadow: var(--rer-shadow);
-            backdrop-filter: blur(12px);
+            min-height: 42px;
+            gap: 5px;
+            padding: 4px 5px 4px 10px;
+            border: 1px solid rgba(23, 38, 49, 0.1);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 10px 28px rgba(18, 32, 42, 0.14), 0 1px 4px rgba(18, 32, 42, 0.07);
+            backdrop-filter: blur(14px);
             overflow: hidden;
         }
 
         .rer-status {
-            min-width: 34px;
-            padding: 0 4px;
+            min-width: 28px;
+            padding: 0 3px 0 1px;
             color: var(--rer-ink);
             font-size: 12px;
             font-weight: 800;
@@ -497,19 +502,25 @@
         .rer-status::before {
             content: "";
             display: inline-block;
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             margin: 0 6px 1px 0;
             border-radius: 50%;
-            background: #23a77e;
-            box-shadow: 0 0 0 3px rgba(35, 167, 126, 0.12);
+            background: #1b9a78;
+            box-shadow: 0 0 0 3px rgba(27, 154, 120, 0.1);
             vertical-align: middle;
+        }
+
+        .rer-toolbar[data-loading="true"] .rer-status::before {
+            animation: rer-status-pulse 900ms ease-in-out infinite alternate;
         }
 
         .rer-toolbar-actions {
             display: flex;
             flex: 0 0 auto;
-            gap: 4px;
+            gap: 2px;
+            padding-left: 4px;
+            border-left: 1px solid rgba(23, 38, 49, 0.08);
         }
 
         .rer-button {
@@ -565,16 +576,47 @@
         }
 
         .rer-toolbar .rer-button {
-            min-height: 34px;
-            padding: 0 9px;
+            min-height: 32px;
+            padding: 0 8px;
         }
 
         .rer-toolbar .rer-icon-button {
             display: inline-grid;
             place-items: center;
-            width: 34px;
+            width: 32px;
             padding: 0;
-            border-radius: 9px;
+            border-color: transparent;
+            border-radius: 8px;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .rer-toolbar .rer-continue-button {
+            color: var(--rer-accent-strong);
+            background: var(--rer-accent-soft);
+        }
+
+        .rer-toolbar .rer-continue-button:hover,
+        .rer-toolbar .rer-continue-button:focus-visible {
+            background: #d9eee8;
+            border-color: rgba(8, 127, 112, 0.16);
+        }
+
+        .rer-toolbar .rer-settings-button {
+            color: #687780;
+        }
+
+        .rer-toolbar .rer-settings-button:hover,
+        .rer-toolbar .rer-settings-button:focus-visible {
+            color: var(--rer-ink);
+            background: #eef2f3;
+            border-color: transparent;
+        }
+
+        .rer-toolbar .rer-continue-button:disabled {
+            opacity: 1;
+            color: var(--rer-accent);
+            background: var(--rer-accent-soft);
         }
 
         .rer-toolbar-icon {
@@ -586,6 +628,35 @@
             stroke-linecap: round;
             stroke-linejoin: round;
             pointer-events: none;
+        }
+
+        .rer-button-spinner {
+            display: none;
+            box-sizing: border-box;
+            width: 15px;
+            height: 15px;
+            border: 2px solid rgba(8, 127, 112, 0.22);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .rer-continue-button[data-loading="true"] .rer-toolbar-icon {
+            display: none;
+        }
+
+        .rer-continue-button[data-loading="true"] .rer-button-spinner {
+            display: block;
+            animation: rer-toolbar-spin 720ms linear infinite;
+        }
+
+        @keyframes rer-toolbar-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes rer-status-pulse {
+            from { opacity: 0.42; transform: scale(0.82); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         .rer-settings-backdrop {
@@ -811,15 +882,46 @@
     `;
 
     function init() {
-        installStyles();
-        registerMenu();
+        if (!document.documentElement) {
+            scheduleInitRetry();
+            return;
+        }
+        initAttempts += 1;
+        let needsRetry = !runInitStep('install styles', installStyles);
         if (!config.enabled) return;
         document.documentElement.classList.add('rer-reading-active');
-        buildToolbar();
-        installInteractionHandlers();
-        enhancePage();
-        observePageChanges();
-        updateLoadedCount();
+
+        needsRetry = !runInitStep('build toolbar', buildToolbar) || needsRetry;
+        if (!interactionHandlersInstalled) {
+            interactionHandlersInstalled = runInitStep('install interaction handlers', installInteractionHandlers);
+            needsRetry = !interactionHandlersInstalled || needsRetry;
+        }
+        if (!pageObserverInstalled) {
+            pageObserverInstalled = runInitStep('observe page changes', observePageChanges);
+            needsRetry = !pageObserverInstalled || needsRetry;
+        }
+        if (!menuRegistered) {
+            menuRegistered = runInitStep('register menu commands', registerMenu);
+        }
+        needsRetry = !runInitStep('enhance page', enhancePage) || needsRetry;
+        needsRetry = !runInitStep('update loaded count', updateLoadedCount) || needsRetry;
+        if (needsRetry) scheduleInitRetry();
+    }
+
+    function runInitStep(label, callback) {
+        try {
+            callback();
+            return true;
+        } catch (error) {
+            console.warn(`[Google News Navigator] Failed to ${label}`, error);
+            return false;
+        }
+    }
+
+    function scheduleInitRetry() {
+        if (initAttempts >= 6) return;
+        const delay = [50, 150, 400, 900, 1800, 3000][initAttempts] || 3000;
+        window.setTimeout(init, delay);
     }
 
     function installStyles() {
@@ -918,23 +1020,19 @@
             toolbarRoot.innerHTML = `
                 <span class="rer-status" data-rer-status aria-live="polite">0</span>
                 <div class="rer-toolbar-actions">
-                    <button type="button" class="rer-button rer-button-primary rer-icon-button" data-rer-action="continue" aria-label="继续加载" title="继续加载">
+                    <button type="button" class="rer-button rer-icon-button rer-continue-button" data-rer-action="continue" data-loading="false" aria-label="继续加载" title="继续加载">
                         <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path d="m7 6 5 5 5-5"></path>
-                            <path d="m7 13 5 5 5-5"></path>
+                            <path d="M12 5v14"></path>
+                            <path d="m19 12-7 7-7-7"></path>
                         </svg>
+                        <span class="rer-button-spinner" aria-hidden="true"></span>
                     </button>
-                    <button type="button" class="rer-button rer-icon-button" data-rer-action="settings" aria-label="设置" title="设置">
+                    <button type="button" class="rer-button rer-icon-button rer-settings-button" data-rer-action="settings" aria-label="设置" title="设置">
                         <svg class="rer-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path d="M21 4h-7"></path>
-                            <path d="M10 4H3"></path>
-                            <path d="M21 12h-9"></path>
-                            <path d="M8 12H3"></path>
-                            <path d="M21 20h-5"></path>
-                            <path d="M12 20H3"></path>
-                            <path d="M14 2v4"></path>
-                            <path d="M8 10v4"></path>
-                            <path d="M16 18v4"></path>
+                            <path d="M20 7h-9"></path>
+                            <path d="M14 17H5"></path>
+                            <circle cx="17" cy="17" r="3"></circle>
+                            <circle cx="7" cy="7" r="3"></circle>
                         </svg>
                     </button>
                 </div>
@@ -1765,7 +1863,11 @@
     function setContinueButtonState(disabled) {
         if (!toolbarRoot) return;
         const button = toolbarRoot.querySelector('[data-rer-action="continue"]');
-        if (button) button.disabled = disabled;
+        toolbarRoot.dataset.loading = String(disabled);
+        if (!button) return;
+        button.disabled = disabled;
+        button.dataset.loading = String(disabled);
+        button.setAttribute('aria-busy', String(disabled));
     }
 
     async function analyzeBatch(batch) {
@@ -2146,7 +2248,7 @@
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else {
-        init();
     }
+    window.addEventListener('pageshow', init);
+    init();
 })();
