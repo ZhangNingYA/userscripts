@@ -8,9 +8,9 @@ const scriptsRoot = path.join(root, 'scripts');
 const siteRoot = path.join(root, 'site');
 const outputRoot = path.join(root, 'dist');
 const sitePresentation = new Map([
-  ['chatgpt.com', { label: 'ChatGPT', url: 'https://chatgpt.com/' }],
-  ['chat.openai.com', { key: 'chatgpt.com', label: 'ChatGPT', url: 'https://chatgpt.com/' }],
-  ['news.google.com', { label: 'Google News', url: 'https://news.google.com/' }],
+  ['chatgpt.com', { label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
+  ['chat.openai.com', { key: 'chatgpt.com', label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
+  ['news.google.com', { label: 'Google News', url: 'https://news.google.com/home?hl=en-US&gl=US&ceid=US:en', display: 'news.google.com/*' }],
   ['reuters.com', { label: 'Reuters', url: 'https://www.reuters.com/' }],
   ['apnews.com', { label: 'AP News', url: 'https://apnews.com/' }],
   ['bbc.com', { label: 'BBC News', url: 'https://www.bbc.com/news' }],
@@ -24,7 +24,7 @@ const sitePresentation = new Map([
   ['nbcnews.com', { label: 'NBC News', url: 'https://www.nbcnews.com/' }],
   ['cbsnews.com', { label: 'CBS News', url: 'https://www.cbsnews.com/' }],
   ['foxnews.com', { label: 'Fox News', url: 'https://www.foxnews.com/' }],
-  ['ptt.cc', { label: 'PTT', url: 'https://www.ptt.cc/' }]
+  ['ptt.cc', { label: 'PTT Gossiping', url: 'https://www.ptt.cc/bbs/Gossiping/index.html', display: 'ptt.cc/bbs/Gossiping/*' }]
 ]);
 
 function titleCaseHostname(hostname) {
@@ -46,9 +46,11 @@ function targetsFromMatches(matches) {
     const key = presentation.key || hostname;
     if (targets.has(key)) continue;
     const url = presentation.url || `https://${hostname}/`;
+    const matchPath = String(match).match(/^https?:\/\/[^/]+(\/.*)$/i)?.[1] || '/';
     targets.set(key, {
       label: presentation.label || titleCaseHostname(hostname),
       hostname: new URL(url).hostname.replace(/^www\./, ''),
+      display: presentation.display || `${hostname}${matchPath}`,
       url
     });
   }
@@ -87,11 +89,11 @@ function escapeHtml(value) {
 function detailPage(script) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const siteRows = script.targets.length
-    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.hostname)}</small></span><span class="external-mark" aria-hidden="true">↗</span></a></li>`).join('')
+    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.display)}</small></span><span class="external-mark" aria-hidden="true">↗</span></a></li>`).join('')
     : '<li>No supported sites declared</li>';
   const primaryTarget = script.targets[0];
   const primarySiteLink = primaryTarget
-    ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(primaryTarget.label)} <span aria-hidden="true">↗</span></a>`
+    ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(primaryTarget.display)} <span aria-hidden="true">↗</span></a>`
     : '';
   return `<!doctype html>
 <html lang="en">
@@ -100,10 +102,10 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=5">
+  <link rel="stylesheet" href="../../assets/styles.css?v=7">
 </head>
 <body>
-  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">Z</span><span>ZhangNingYA</span><span class="wordmark-section">/ Userscripts</span></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
+  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
   <main class="page-shell detail-shell">
     <a class="back-link" href="../../"><span aria-hidden="true">←</span> All scripts</a>
     <article class="detail-article">
@@ -124,7 +126,7 @@ function detailPage(script) {
       </div>
     </article>
   </main>
-  <footer><span>Maintained by ZhangNingYA</span><span>Public source, no embedded secrets</span></footer>
+  <footer><span>Userscripts</span><span>Public source, no embedded secrets</span></footer>
 </body>
 </html>`;
 }

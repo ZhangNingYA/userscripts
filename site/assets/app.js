@@ -21,8 +21,9 @@ fetch(catalogUrl, { cache: 'no-store' })
     }
     grid.innerHTML = scripts.map((script, index) => {
       const target = script.targets && script.targets[0];
+      const extraTargets = Math.max(0, (script.targets?.length || 0) - 1);
       const targetLink = target
-        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(target.label)} <span aria-hidden="true">↗</span></a>`
+        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(target.display || target.hostname)}</span>${extraTargets ? `<small>+${extraTargets} sites</small>` : ''}<span aria-hidden="true">↗</span></a>`
         : '';
       return `
       <article class="script-entry">

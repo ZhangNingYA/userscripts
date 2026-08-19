@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.1.3
+// @version      1.2.0
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,15 +42,19 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.1.3';
-    const SCRIPT_RELEASED_AT = '2026-08-19 16:12:34 UTC+8';
+    const SCRIPT_VERSION = '1.2.0';
+    const SCRIPT_RELEASED_AT = '2026-08-19 17:01:10 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
+    const PENDING_ANALYSIS_KEY = 'google-news-english-reader-pending-v1';
     const SENTENCE_PREFIX = 'gner-s';
     const ANALYSIS_BATCH_SIZE = 3;
     const ANALYSIS_CONCURRENCY = 2;
     const CACHE_LIMIT = 400;
+    const PENDING_PAGE_LIMIT = 20;
+    const PENDING_TEXT_LIMIT = 500;
+    const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
     const REQUEST_TIMEOUT_MS = 120000;
     const REQUEST_MAX_ATTEMPTS = 2;
     const REQUEST_RETRY_DELAY_MS = 1000;
@@ -169,6 +173,7 @@
 
     let config = loadConfig();
     let analysisCache = loadAnalysisCache();
+    let pendingAnalysis = loadPendingAnalysis();
     let sentenceCounter = 0;
     let stylesInstalled = false;
     let toolbarRoot = null;
@@ -184,8 +189,12 @@
     let interactionHandlersInstalled = false;
     let menuRegistered = false;
     let pageObserverInstalled = false;
+    let pageLifecycleInstalled = false;
+    let pageClosing = false;
+    let pendingResumeTimer = 0;
     const sentences = new Map();
     const queuedSentenceIds = new Set();
+    const activeRequests = new Set();
 
     const css = String.raw`
         :root {
@@ -900,6 +909,10 @@
             pageObserverInstalled = runInitStep('observe page changes', observePageChanges);
             needsRetry = !pageObserverInstalled || needsRetry;
         }
+        if (!pageLifecycleInstalled) {
+            pageLifecycleInstalled = runInitStep('install page lifecycle handlers', installPageLifecycleHandlers);
+            needsRetry = !pageLifecycleInstalled || needsRetry;
+        }
         if (!menuRegistered) {
             menuRegistered = runInitStep('register menu commands', registerMenu);
         }
@@ -989,6 +1002,83 @@
             analysisCache = Object.fromEntries(entries.slice(0, CACHE_LIMIT));
         }
         safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
+    }
+
+    function loadPendingAnalysis() {
+        const stored = safeGetValue(PENDING_ANALYSIS_KEY, {});
+        if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+        const cutoff = Date.now() - PENDING_TTL_MS;
+        const entries = Object.entries(stored)
+            .filter(([, entry]) => entry
+                && Array.isArray(entry.texts)
+                && entry.texts.length
+                && Number(entry.savedAt) >= cutoff)
+            .sort((left, right) => Number(right[1].savedAt) - Number(left[1].savedAt))
+            .slice(0, PENDING_PAGE_LIMIT)
+            .map(([pageKey, entry]) => [pageKey, {
+                texts: Array.from(new Set(entry.texts.map(normalizeReadingText).filter(Boolean)))
+                    .slice(0, PENDING_TEXT_LIMIT),
+                savedAt: Number(entry.savedAt) || Date.now()
+            }]);
+        return Object.fromEntries(entries);
+    }
+
+    function savePendingAnalysis() {
+        const entries = Object.entries(pendingAnalysis)
+            .filter(([, entry]) => entry && Array.isArray(entry.texts) && entry.texts.length)
+            .sort((left, right) => Number(right[1].savedAt) - Number(left[1].savedAt))
+            .slice(0, PENDING_PAGE_LIMIT);
+        pendingAnalysis = Object.fromEntries(entries);
+        safeSetValue(PENDING_ANALYSIS_KEY, pendingAnalysis);
+    }
+
+    function persistPendingItems(items) {
+        const grouped = new Map();
+        for (const item of items) {
+            if (!item || !item.text) continue;
+            const pageKey = item.pageKey || getReadingPageKey();
+            if (!grouped.has(pageKey)) grouped.set(pageKey, []);
+            grouped.get(pageKey).push(item.text);
+        }
+        for (const [pageKey, textsToAdd] of grouped) {
+            const existing = pendingAnalysis[pageKey];
+            const texts = new Set(existing && Array.isArray(existing.texts) ? existing.texts : []);
+            for (const text of textsToAdd) texts.add(text);
+            pendingAnalysis[pageKey] = {
+                texts: Array.from(texts).slice(-PENDING_TEXT_LIMIT),
+                savedAt: Date.now()
+            };
+        }
+        if (grouped.size) savePendingAnalysis();
+    }
+
+    function completePendingItem(item) {
+        if (!item || !item.text) return;
+        const pageKey = item.pageKey || getReadingPageKey();
+        const entry = pendingAnalysis[pageKey];
+        if (!entry || !Array.isArray(entry.texts)) return;
+        entry.texts = entry.texts.filter((text) => text !== item.text);
+        entry.savedAt = Date.now();
+        if (!entry.texts.length) delete pendingAnalysis[pageKey];
+        savePendingAnalysis();
+    }
+
+    function discardPendingItems(items) {
+        const removals = new Map();
+        for (const item of items) {
+            if (!item || !item.text) continue;
+            const pageKey = item.pageKey || getReadingPageKey();
+            if (!removals.has(pageKey)) removals.set(pageKey, new Set());
+            removals.get(pageKey).add(item.text);
+        }
+        for (const [pageKey, texts] of removals) {
+            const entry = pendingAnalysis[pageKey];
+            if (!entry || !Array.isArray(entry.texts)) continue;
+            entry.texts = entry.texts.filter((text) => !texts.has(text));
+            entry.savedAt = Date.now();
+            if (!entry.texts.length) delete pendingAnalysis[pageKey];
+        }
+        if (removals.size) savePendingAnalysis();
     }
 
     function safeGetValue(key, fallback) {
@@ -1257,6 +1347,7 @@
             updateLoadedCount();
             return;
         }
+        const pageKey = getReadingPageKey();
         const readingElements = collectReadingElements(root);
         let changed = 0;
         for (const { element, kind, detailOutside } of readingElements) {
@@ -1295,6 +1386,7 @@
                 const item = {
                     id,
                     text: part.text,
+                    pageKey,
                     start: part.start,
                     end: part.end,
                     order: sentenceCounter,
@@ -1325,6 +1417,7 @@
             updateStructureHighlights();
             if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
         }
+        if (getConfigReady()) queuePendingAnalysisResume();
     }
 
     function buildTextMap(element) {
@@ -1607,6 +1700,60 @@
         observer.observe(document.documentElement, { childList: true, subtree: true });
     }
 
+    function installPageLifecycleHandlers() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                window.clearTimeout(autoAnalyzeTimer);
+                autoAnalyzeTimer = 0;
+                return;
+            }
+            pageClosing = false;
+            queuePendingAnalysisResume();
+            drainQueuedAnalysis();
+            if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
+        });
+        window.addEventListener('pagehide', () => {
+            pageClosing = true;
+            analysisGeneration += 1;
+            window.clearTimeout(autoAnalyzeTimer);
+            window.clearTimeout(pendingResumeTimer);
+            autoAnalyzeTimer = 0;
+            pendingResumeTimer = 0;
+            abortActiveRequests();
+        });
+        window.addEventListener('pageshow', () => {
+            pageClosing = false;
+            queuePendingAnalysisResume();
+            drainQueuedAnalysis();
+        });
+    }
+
+    function waitForVisiblePage() {
+        if (document.visibilityState !== 'hidden' || pageClosing) return Promise.resolve();
+        return new Promise((resolve) => {
+            const resume = () => {
+                if (document.visibilityState === 'hidden' && !pageClosing) return;
+                document.removeEventListener('visibilitychange', resume);
+                window.removeEventListener('pagehide', resume);
+                resolve();
+            };
+            document.addEventListener('visibilitychange', resume);
+            window.addEventListener('pagehide', resume);
+        });
+    }
+
+    function abortActiveRequests() {
+        const requests = Array.from(activeRequests);
+        activeRequests.clear();
+        for (const request of requests) {
+            try {
+                request.abort();
+            } catch (error) {
+                console.warn('[Google News Navigator] Failed to abort request', error);
+            }
+        }
+    }
+
     function installInteractionHandlers() {
         document.addEventListener('click', (event) => {
             const actionNode = event.target.closest('[data-rer-sentence-action]');
@@ -1704,6 +1851,8 @@
         autoAnalyzeTimer = window.setTimeout(() => {
             if (autoAnalyzeQueuedKey !== pageKey
                 || pageKey !== getReadingPageKey()
+                || document.visibilityState === 'hidden'
+                || pageClosing
                 || !config.enabled
                 || !config.autoAnalyze
                 || !getConfigReady()) return;
@@ -1711,6 +1860,31 @@
             autoAnalyzedPageKey = pageKey;
             analyzeSentences({ automatic: true });
         }, 700);
+    }
+
+    function queuePendingAnalysisResume() {
+        if (pageClosing || document.visibilityState === 'hidden' || !getConfigReady()) return;
+        const pageKey = getReadingPageKey();
+        const entry = pendingAnalysis[pageKey];
+        if (!entry || !Array.isArray(entry.texts) || !entry.texts.length) return;
+        window.clearTimeout(pendingResumeTimer);
+        pendingResumeTimer = window.setTimeout(() => {
+            pendingResumeTimer = 0;
+            if (pageClosing
+                || document.visibilityState === 'hidden'
+                || pageKey !== getReadingPageKey()) return;
+            const current = pendingAnalysis[pageKey];
+            if (!current || !Array.isArray(current.texts) || !current.texts.length) return;
+            const pendingTexts = new Set(current.texts);
+            const ordered = getConnectedReadingItems();
+            const completed = ordered.filter((item) => item.ready && pendingTexts.has(item.text));
+            if (completed.length) discardPendingItems(completed);
+            const items = ordered.filter((item) => !item.ready
+                && !item.loading
+                && !item.queued
+                && pendingTexts.has(item.text));
+            if (items.length) analyzeSentences({ items });
+        }, 250);
     }
 
     function getReadingPageKey() {
@@ -1751,13 +1925,16 @@
 
     function clearAnalysisCache() {
         analysisGeneration += 1;
+        abortActiveRequests();
         window.clearTimeout(autoAnalyzeTimer);
         autoAnalyzeQueuedKey = '';
         autoAnalyzedPageKey = getReadingPageKey();
         queuedFullAnalysis = false;
         queuedSentenceIds.clear();
         analysisCache = {};
+        pendingAnalysis = {};
         safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
+        safeSetValue(PENDING_ANALYSIS_KEY, pendingAnalysis);
 
         for (const item of getConnectedReadingItems()) {
             item.ready = false;
@@ -1786,6 +1963,11 @@
             queueAnalysisRequest(options);
             return;
         }
+        if (pageClosing) return;
+        if (document.visibilityState === 'hidden') {
+            queueAnalysisRequest(options);
+            return;
+        }
         if (!ensureReady()) return;
         enhancePage();
         const ordered = getConnectedReadingItems();
@@ -1803,6 +1985,7 @@
             updateLoadedCount();
             return;
         }
+        persistPendingItems(pending);
         const runGeneration = analysisGeneration;
         analyzeRunning = true;
         setContinueButtonState(true);
@@ -1821,7 +2004,9 @@
         const failures = new Map();
         let fatalError = null;
         const worker = async () => {
-            while (!fatalError && nextBatch < batches.length) {
+            while (!fatalError && !pageClosing && nextBatch < batches.length) {
+                await waitForVisiblePage();
+                if (fatalError || pageClosing || nextBatch >= batches.length) break;
                 const batch = batches[nextBatch++];
                 try {
                     const results = await analyzeBatchWithFallback(batch);
@@ -1834,11 +2019,13 @@
                     for (const item of batch) {
                         if (!appliedIds.has(item.id)) failures.set(item, '模型返回结果不完整，请重试。');
                     }
-                    if (runGeneration === analysisGeneration) saveAnalysisCache();
                 } catch (error) {
                     const message = getAnalysisFailureMessage(error);
                     for (const item of batch) failures.set(item, message);
-                    if (isFatalRequestError(error)) fatalError = error;
+                    if (isFatalRequestError(error)) {
+                        fatalError = error;
+                        discardPendingItems(batch);
+                    }
                     console.warn('[Google News Navigator] Analysis batch failed', error);
                 }
                 updateLoadedCount();
@@ -1852,10 +2039,10 @@
                 for (const item of pending) {
                     if (!item.ready) failures.set(item, message);
                 }
+                discardPendingItems(pending);
                 queuedFullAnalysis = false;
                 queuedSentenceIds.clear();
             }
-            if (runGeneration === analysisGeneration) saveAnalysisCache();
             if (failures.size) console.info(`[Google News Navigator] ${failures.size} item(s) remain unloaded.`);
         } finally {
             for (const item of pending) {
@@ -1876,16 +2063,20 @@
     function queueAnalysisRequest(options) {
         if (options.all) {
             queuedFullAnalysis = true;
+            persistPendingItems(getConnectedReadingItems().filter((item) => !item.ready));
             return;
         }
         if (!Array.isArray(options.items)) return;
+        const queuedItems = [];
         for (const item of options.items) {
             if (!item || item.ready || item.loading || item.queued) continue;
             item.queued = true;
             queuedSentenceIds.add(item.id);
+            queuedItems.push(item);
             setDetailMessage(item, '已加入加载队列...');
             updateDetailToggleLabel(item);
         }
+        persistPendingItems(queuedItems);
     }
 
     function drainQueuedAnalysis() {
@@ -1999,11 +2190,7 @@
     function applyAnalysisResult(result, persist) {
         if (!result || typeof result !== 'object') return false;
         const item = sentences.get(result.id);
-        if (!item
-            || !item.element
-            || !item.element.isConnected
-            || !item.toggleNode.isConnected
-            || !item.detailNode.isConnected) return false;
+        if (!item) return false;
         const translation = normalizeReadingText(result.translation || result.text || '');
         if (!translation) return false;
         const phrases = sanitizePhrases(result.phrases);
@@ -2014,6 +2201,14 @@
         const spans = structureReliable ? candidateSpans : [];
         const pattern = structureReliable ? derivedPattern : '未完整识别';
         const normalized = { translation, phrases, pattern, spans, structureReliable };
+        const connected = item.element
+            && item.element.isConnected
+            && item.toggleNode.isConnected
+            && item.detailNode.isConnected;
+        if (!connected) {
+            if (persist) persistAnalysisResult(item, normalized);
+            return Boolean(persist);
+        }
         try {
             renderSentenceDetail(item, normalized);
         } catch (error) {
@@ -2029,8 +2224,14 @@
         item.toggleNode.classList.add('rer-detail-ready');
         updateDetailToggleLabel(item);
         updateStructureHighlights();
-        if (persist) cacheAnalysis(item, normalized);
+        if (persist) persistAnalysisResult(item, normalized);
         return true;
+    }
+
+    function persistAnalysisResult(item, result) {
+        cacheAnalysis(item, result);
+        saveAnalysisCache();
+        completePendingItem(item);
     }
 
     function sanitizePhrases(phrases) {
@@ -2213,7 +2414,11 @@
             } catch (error) {
                 lastError = error;
                 const splitNow = options.splitOnTimeout && error.code === 'timeout';
-                if (!error.retryable || splitNow || attempt >= maxAttempts) throw error;
+                if (pageClosing
+                    || error.code === 'aborted'
+                    || !error.retryable
+                    || splitNow
+                    || attempt >= maxAttempts) throw error;
                 await delay(REQUEST_RETRY_DELAY_MS * attempt);
             }
         }
@@ -2254,35 +2459,49 @@
 
     function requestApiOnce(url, body) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'POST',
-                url,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${config.apiKey}`
-                },
-                data: JSON.stringify(body),
-                timeout: REQUEST_TIMEOUT_MS,
-                onload: (response) => {
-                    if (response.status < 200 || response.status >= 300) {
-                        reject(createApiResponseError(response));
-                        return;
-                    }
-                    try {
-                        const data = JSON.parse(response.responseText || '{}');
-                        const content = extractApiResponseContent(data);
-                        if (!content) {
-                            reject(new Error('API 响应中没有可用文本。'));
+            let request = null;
+            let settled = false;
+            const settle = (callback, value) => {
+                if (settled) return;
+                settled = true;
+                if (request) activeRequests.delete(request);
+                callback(value);
+            };
+            try {
+                request = GM_xmlhttpRequest({
+                    method: 'POST',
+                    url,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${config.apiKey}`
+                    },
+                    data: JSON.stringify(body),
+                    timeout: REQUEST_TIMEOUT_MS,
+                    onload: (response) => {
+                        if (response.status < 200 || response.status >= 300) {
+                            settle(reject, createApiResponseError(response));
                             return;
                         }
-                        resolve(content.trim());
-                    } catch (error) {
-                        reject(new Error(`API 响应解析失败：${error.message || String(error)}`));
-                    }
-                },
-                onerror: () => reject(createRequestError('API 网络请求失败。', true, 'network')),
-                ontimeout: () => reject(createRequestError(`API 请求超过 ${REQUEST_TIMEOUT_MS / 1000} 秒。`, true, 'timeout'))
-            });
+                        try {
+                            const data = JSON.parse(response.responseText || '{}');
+                            const content = extractApiResponseContent(data);
+                            if (!content) {
+                                settle(reject, new Error('API 响应中没有可用文本。'));
+                                return;
+                            }
+                            settle(resolve, content.trim());
+                        } catch (error) {
+                            settle(reject, new Error(`API 响应解析失败：${error.message || String(error)}`));
+                        }
+                    },
+                    onerror: () => settle(reject, createRequestError('API 网络请求失败。', true, 'network')),
+                    ontimeout: () => settle(reject, createRequestError(`API 请求超过 ${REQUEST_TIMEOUT_MS / 1000} 秒。`, true, 'timeout')),
+                    onabort: () => settle(reject, createRequestError('页面已关闭，将在重新打开后继续。', true, 'aborted'))
+                });
+                if (request && typeof request.abort === 'function' && !settled) activeRequests.add(request);
+            } catch (error) {
+                settle(reject, createRequestError(`API 请求无法启动：${error.message || String(error)}`, true, 'network'));
+            }
         });
     }
 
@@ -2322,6 +2541,7 @@
 
     function getAnalysisFailureMessage(error) {
         if (error && error.code === 'unsupported-prompt-cache') return '接口缓存配置不兼容，请重试或联系网关管理员。';
+        if (error && error.code === 'aborted') return '页面已离开，将在重新打开后继续。';
         if (error && error.code === 'timeout') return '请求超时，请单独重试本句。';
         if (error && (error.code === 'http-401' || error.code === 'http-403')) return 'URL 或 Key 无效，请检查设置。';
         if (error && error.code === 'network') return '网络连接失败，请稍后重试。';
