@@ -3,7 +3,7 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.2.0
+// @version      1.2.1
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
@@ -42,8 +42,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.2.0';
-    const SCRIPT_RELEASED_AT = '2026-08-19 17:01:10 UTC+8';
+    const SCRIPT_VERSION = '1.2.1';
+    const SCRIPT_RELEASED_AT = '2026-08-19 20:10:34 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -158,6 +158,7 @@
         '[class*="subscribe" i]', '[class*="timestamp" i]', '[class*="byline" i]',
         '[class*="author" i]', '[class*="metadata" i]'
     ].join(',');
+    const SCRIPT_UI_SELECTOR = '.rer-toolbar, .rer-settings-root, .rer-inline-control, .rer-detail-panel';
     const ROLE_CLASS = {
         subject: 'rer-role-subject',
         predicate: 'rer-role-predicate',
@@ -195,6 +196,7 @@
     const sentences = new Map();
     const queuedSentenceIds = new Set();
     const activeRequests = new Set();
+    const failedPendingKeys = new Set();
 
     const css = String.raw`
         :root {
@@ -918,6 +920,7 @@
         }
         needsRetry = !runInitStep('enhance page', enhancePage) || needsRetry;
         needsRetry = !runInitStep('update loaded count', updateLoadedCount) || needsRetry;
+        if (getConfigReady()) queuePendingAnalysisResume();
         if (needsRetry) scheduleInitRetry();
     }
 
@@ -1030,6 +1033,32 @@
             .slice(0, PENDING_PAGE_LIMIT);
         pendingAnalysis = Object.fromEntries(entries);
         safeSetValue(PENDING_ANALYSIS_KEY, pendingAnalysis);
+    }
+
+    function getPendingFailureKey(pageKey, text) {
+        return `${pageKey}\n${text}`;
+    }
+
+    function isPendingAnalysisFailed(item) {
+        return Boolean(item && failedPendingKeys.has(getPendingFailureKey(item.pageKey, item.text)));
+    }
+
+    function clearPendingAnalysisFailures(items) {
+        for (const item of items || []) {
+            if (!item || !item.text) continue;
+            failedPendingKeys.delete(getPendingFailureKey(item.pageKey || getReadingPageKey(), item.text));
+        }
+    }
+
+    function markPendingAnalysisFailures(items, failures) {
+        if (pageClosing) return;
+        for (const item of items || []) {
+            if (!item || !failures.has(item)) continue;
+            const pageKey = item.pageKey || getReadingPageKey();
+            const entry = pendingAnalysis[pageKey];
+            if (!entry || !Array.isArray(entry.texts) || !entry.texts.includes(item.text)) continue;
+            failedPendingKeys.add(getPendingFailureKey(pageKey, item.text));
+        }
     }
 
     function persistPendingItems(items) {
@@ -1262,6 +1291,7 @@
             ])
         );
         settingsRoot = document.createElement('div');
+        settingsRoot.className = 'rer-settings-root';
         settingsRoot.append(backdrop, panel);
         document.documentElement.append(settingsRoot);
 
@@ -1416,8 +1446,9 @@
             updateLoadedCount();
             updateStructureHighlights();
             if (config.autoAnalyze && getConfigReady()) queueAutoAnalyze();
+            if (getConfigReady()) queuePendingAnalysisResume();
         }
-        if (getConfigReady()) queuePendingAnalysisResume();
+        return changed;
     }
 
     function buildTextMap(element) {
@@ -1692,8 +1723,13 @@
 
     function observePageChanges() {
         let timer = 0;
-        const observer = new MutationObserver(() => {
+        const observer = new MutationObserver((mutations) => {
             if (!toolbarRoot || !toolbarRoot.isConnected) buildToolbar();
+            const hasExternalAddition = mutations.some((mutation) => Array.from(mutation.addedNodes).some((node) => {
+                const element = node instanceof Element ? node : node.parentElement;
+                return Boolean(element && !element.closest(SCRIPT_UI_SELECTOR));
+            }));
+            if (!hasExternalAddition) return;
             window.clearTimeout(timer);
             timer = window.setTimeout(enhancePage, 500);
         });
@@ -1882,8 +1918,9 @@
             const items = ordered.filter((item) => !item.ready
                 && !item.loading
                 && !item.queued
+                && !isPendingAnalysisFailed(item)
                 && pendingTexts.has(item.text));
-            if (items.length) analyzeSentences({ items });
+            if (items.length) analyzeSentences({ items, resume: true });
         }, 250);
     }
 
@@ -1933,6 +1970,7 @@
         queuedSentenceIds.clear();
         analysisCache = {};
         pendingAnalysis = {};
+        failedPendingKeys.clear();
         safeSetValue(ANALYSIS_CACHE_KEY, analysisCache);
         safeSetValue(PENDING_ANALYSIS_KEY, pendingAnalysis);
 
@@ -1977,6 +2015,7 @@
             : ordered;
         const available = candidates.filter((item) => !item.ready
             && !item.loading
+            && ((!options.automatic && !options.resume) || !isPendingAnalysisFailed(item))
             && (!item.queued || requestedItems || options.all));
         const pending = options.all || requestedItems
             ? available
@@ -1985,6 +2024,7 @@
             updateLoadedCount();
             return;
         }
+        if (!options.automatic && !options.resume) clearPendingAnalysisFailures(pending);
         persistPendingItems(pending);
         const runGeneration = analysisGeneration;
         analyzeRunning = true;
@@ -2045,6 +2085,7 @@
             }
             if (failures.size) console.info(`[Google News Navigator] ${failures.size} item(s) remain unloaded.`);
         } finally {
+            markPendingAnalysisFailures(pending, failures);
             for (const item of pending) {
                 item.loading = false;
                 if (!item.ready) {
@@ -2229,6 +2270,7 @@
     }
 
     function persistAnalysisResult(item, result) {
+        clearPendingAnalysisFailures([item]);
         cacheAnalysis(item, result);
         saveAnalysisCache();
         completePendingItem(item);
