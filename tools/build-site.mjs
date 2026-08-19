@@ -7,6 +7,53 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const scriptsRoot = path.join(root, 'scripts');
 const siteRoot = path.join(root, 'site');
 const outputRoot = path.join(root, 'dist');
+const sitePresentation = new Map([
+  ['chatgpt.com', { label: 'ChatGPT', url: 'https://chatgpt.com/' }],
+  ['chat.openai.com', { key: 'chatgpt.com', label: 'ChatGPT', url: 'https://chatgpt.com/' }],
+  ['news.google.com', { label: 'Google News', url: 'https://news.google.com/' }],
+  ['reuters.com', { label: 'Reuters', url: 'https://www.reuters.com/' }],
+  ['apnews.com', { label: 'AP News', url: 'https://apnews.com/' }],
+  ['bbc.com', { label: 'BBC News', url: 'https://www.bbc.com/news' }],
+  ['bbc.co.uk', { key: 'bbc.com', label: 'BBC News', url: 'https://www.bbc.com/news' }],
+  ['cnn.com', { label: 'CNN', url: 'https://www.cnn.com/' }],
+  ['edition.cnn.com', { key: 'cnn.com', label: 'CNN', url: 'https://www.cnn.com/' }],
+  ['theguardian.com', { label: 'The Guardian', url: 'https://www.theguardian.com/' }],
+  ['nytimes.com', { label: 'The New York Times', url: 'https://www.nytimes.com/' }],
+  ['washingtonpost.com', { label: 'The Washington Post', url: 'https://www.washingtonpost.com/' }],
+  ['cnbc.com', { label: 'CNBC', url: 'https://www.cnbc.com/' }],
+  ['nbcnews.com', { label: 'NBC News', url: 'https://www.nbcnews.com/' }],
+  ['cbsnews.com', { label: 'CBS News', url: 'https://www.cbsnews.com/' }],
+  ['foxnews.com', { label: 'Fox News', url: 'https://www.foxnews.com/' }],
+  ['ptt.cc', { label: 'PTT', url: 'https://www.ptt.cc/' }]
+]);
+
+function titleCaseHostname(hostname) {
+  return hostname
+    .split('.')[0]
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function targetsFromMatches(matches) {
+  const targets = new Map();
+  for (const match of matches) {
+    const hostMatch = String(match).match(/^https?:\/\/([^/]+)/i);
+    if (!hostMatch) continue;
+    const hostname = hostMatch[1].replace(/^\*\./, '').replace(/^www\./, '').toLowerCase();
+    const presentation = sitePresentation.get(hostname) || {};
+    const key = presentation.key || hostname;
+    if (targets.has(key)) continue;
+    const url = presentation.url || `https://${hostname}/`;
+    targets.set(key, {
+      label: presentation.label || titleCaseHostname(hostname),
+      hostname: new URL(url).hostname.replace(/^www\./, ''),
+      url
+    });
+  }
+  return Array.from(targets.values());
+}
 
 function parseMetadata(source) {
   const block = source.match(/\/\/ ==UserScript==([\s\S]*?)\/\/ ==\/UserScript==/);
@@ -39,9 +86,13 @@ function escapeHtml(value) {
 
 function detailPage(script) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
-  const matchRows = script.matches.length
-    ? script.matches.map((match) => `<li><code>${escapeHtml(match)}</code></li>`).join('')
-    : '<li>No URL patterns declared</li>';
+  const siteRows = script.targets.length
+    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.hostname)}</small></span><span class="external-mark" aria-hidden="true">↗</span></a></li>`).join('')
+    : '<li>No supported sites declared</li>';
+  const primaryTarget = script.targets[0];
+  const primarySiteLink = primaryTarget
+    ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(primaryTarget.label)} <span aria-hidden="true">↗</span></a>`
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -49,7 +100,7 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=3">
+  <link rel="stylesheet" href="../../assets/styles.css?v=4">
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">Z</span><span>ZhangNingYA</span><span class="wordmark-section">/ Userscripts</span></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
@@ -62,11 +113,12 @@ function detailPage(script) {
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
           <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install .user.js</a>
+          ${primarySiteLink}
           <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
         </div>
       </header>
       <div class="detail-grid">
-        <section><h2>Runs on</h2><ul class="match-list">${matchRows}</ul></section>
+        <section class="runs-on"><div class="section-copy"><h2>Runs on</h2><p>${script.targets.length} supported ${script.targets.length === 1 ? 'site' : 'sites'}</p></div><ul class="site-list">${siteRows}</ul></section>
         <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
         <section><h2>Updates</h2><p>Your userscript manager checks the published version automatically through the script's update URL.</p></section>
       </div>
@@ -96,6 +148,7 @@ for (const folder of folders) {
   const metadata = parseMetadata(await readFile(sourceFile, 'utf8'));
   if (!metadata.name || !metadata.version || !metadata.description) throw new Error(`${filename} is missing required metadata`);
   const script = { slug: folder.name, filename, textFilename, ...metadata };
+  script.targets = targetsFromMatches(script.matches);
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
   await mkdir(targetFolder, { recursive: true });
   await copyFile(sourceFile, path.join(targetFolder, filename));

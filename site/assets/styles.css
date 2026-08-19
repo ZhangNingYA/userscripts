@@ -1,18 +1,18 @@
 :root {
   color-scheme: light;
-  --page: #f1f3f0;
-  --surface: #fbfcfa;
-  --surface-muted: #e7ebe7;
-  --text: #202520;
-  --muted: #5e675f;
-  --subtle: #7d867f;
-  --line: #d2d8d3;
-  --line-strong: #aab4ac;
-  --accent: #276348;
-  --accent-hover: #194b36;
-  --accent-soft: #dfece4;
-  --warm: #8b4b39;
-  --warm-soft: #f0e3de;
+  --page: #f4f6f7;
+  --surface: #ffffff;
+  --surface-muted: #edf1f3;
+  --text: #172127;
+  --muted: #56636b;
+  --subtle: #7a8790;
+  --line: #dbe1e5;
+  --line-strong: #b6c0c7;
+  --accent: #087f70;
+  --accent-hover: #056459;
+  --accent-soft: #e5f3ef;
+  --warm: #ad4655;
+  --warm-soft: #f8e9ec;
   --interface: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --reading: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 }
@@ -59,7 +59,7 @@ a:focus-visible {
 .topbar-inner,
 .page-shell,
 footer {
-  width: min(900px, calc(100% - 48px));
+  width: min(1040px, calc(100% - 48px));
   margin-right: auto;
   margin-left: auto;
 }
@@ -91,8 +91,8 @@ footer {
   place-items: center;
   flex: 0 0 26px;
   color: #f8faf7;
-  background: #28342d;
-  border-radius: 4px;
+  background: #172127;
+  border-radius: 6px;
   font-family: var(--reading);
   font-size: 13px;
   font-weight: 700;
@@ -124,8 +124,8 @@ footer {
 }
 
 .intro {
-  max-width: 650px;
-  padding: 46px 0 34px;
+  max-width: 680px;
+  padding: 42px 0 32px;
 }
 
 .section-label,
@@ -188,22 +188,26 @@ footer {
 
 .script-list {
   display: grid;
+  border-bottom: 1px solid var(--line);
 }
 
 .script-entry {
   min-width: 0;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 118px;
+  grid-template-columns: 38px minmax(0, 1fr) 126px;
   align-items: center;
   gap: 18px;
-  padding: 25px 8px;
+  padding: 24px 14px 24px 8px;
   border-bottom: 1px solid var(--line);
   transition: background-color .16s ease, border-color .16s ease;
 }
 
 .script-entry:hover {
   background: var(--surface);
-  border-color: var(--line-strong);
+}
+
+.script-entry:last-child {
+  border-bottom: 0;
 }
 
 .script-index {
@@ -243,6 +247,23 @@ footer {
   line-height: 1.65;
 }
 
+.script-site-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.script-site-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .entry-actions {
   display: grid;
   justify-items: end;
@@ -250,6 +271,7 @@ footer {
 }
 
 .primary-button,
+.site-button,
 .text-download {
   min-height: 38px;
   display: inline-flex;
@@ -276,7 +298,7 @@ footer {
 }
 
 .detail-shell {
-  padding: 31px 0 72px;
+  padding: 30px 0 72px;
 }
 
 .back-link {
@@ -287,11 +309,11 @@ footer {
 }
 
 .detail-article {
-  max-width: 780px;
+  max-width: 960px;
 }
 
 .detail-heading {
-  padding: 34px 0 36px;
+  padding: 34px 0 38px;
   border-top: 1px solid var(--line-strong);
   border-bottom: 1px solid var(--line);
 }
@@ -315,6 +337,21 @@ footer {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 24px;
+}
+
+.site-button {
+  gap: 7px;
+  padding: 0 14px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid #b9ddd4;
+  border-radius: 4px;
+}
+
+.site-button:hover {
+  color: #ffffff;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .text-download {
@@ -348,8 +385,8 @@ footer {
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px 46px;
-  padding-top: 32px;
+  gap: 30px 48px;
+  padding-top: 30px;
 }
 
 .detail-grid section {
@@ -359,8 +396,7 @@ footer {
 }
 
 .detail-grid section:last-child {
-  grid-column: 1 / -1;
-  max-width: 540px;
+  max-width: none;
 }
 
 .detail-grid h2 {
@@ -371,18 +407,96 @@ footer {
 }
 
 .detail-grid p,
-.match-list,
+.site-list,
 .file-list {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
 }
 
-.match-list {
+.runs-on {
+  grid-column: 1 / -1;
+}
+
+.section-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 13px;
+}
+
+.section-copy h2 {
+  margin-bottom: 0;
+}
+
+.section-copy p {
+  color: var(--subtle);
+  font-size: 10px;
+}
+
+.site-list {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 0;
   list-style: none;
+}
+
+.site-list li {
+  min-width: 0;
+}
+
+.site-link {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: color .16s ease, border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+.site-link:hover {
+  color: var(--accent-hover);
+  background: #fbfdfc;
+  border-color: #8fc7ba;
+  transform: translateY(-1px);
+}
+
+.site-link > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.site-link strong,
+.site-link small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-link strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.site-link small {
+  color: var(--subtle);
+  font-size: 9px;
+}
+
+.external-mark {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 13px;
 }
 
 .file-list {
@@ -410,16 +524,6 @@ footer {
   color: var(--accent);
   overflow-wrap: anywhere;
   text-underline-offset: 3px;
-}
-
-code {
-  padding: 3px 5px;
-  color: #39443c;
-  background: var(--surface-muted);
-  border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 10px;
-  overflow-wrap: anywhere;
 }
 
 .empty-state {
@@ -519,6 +623,14 @@ footer {
     grid-column: auto;
   }
 
+  .runs-on {
+    grid-column: auto;
+  }
+
+  .site-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   footer {
     min-height: 76px;
     align-items: flex-start;
@@ -539,8 +651,13 @@ footer {
   }
 
   .detail-actions .primary-button,
+  .detail-actions .site-button,
   .detail-actions .text-download {
     width: 100%;
+  }
+
+  .site-list {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -19,19 +19,26 @@ fetch(catalogUrl, { cache: 'no-store' })
       grid.innerHTML = '<p class="empty-state">No scripts have been published yet.</p>';
       return;
     }
-    grid.innerHTML = scripts.map((script, index) => `
+    grid.innerHTML = scripts.map((script, index) => {
+      const target = script.targets && script.targets[0];
+      const targetLink = target
+        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(target.label)} <span aria-hidden="true">↗</span></a>`
+        : '';
+      return `
       <article class="script-entry">
         <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
           <p class="script-meta">Userscript <span aria-hidden="true">/</span> v${escapeHtml(script.version)}</p>
           <h3><a href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
+          ${targetLink}
         </div>
         <div class="entry-actions">
           <a class="secondary-link" href="scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}">Details <span aria-hidden="true">→</span></a>
           <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}?v=${encodeURIComponent(script.version)}">Install</a>
         </div>
-      </article>`).join('');
+      </article>`;
+    }).join('');
   })
   .catch((error) => {
     count.textContent = 'Unavailable';
