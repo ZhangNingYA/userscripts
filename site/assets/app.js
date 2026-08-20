@@ -22,7 +22,7 @@ fetch(catalogUrl, { cache: 'no-store' })
   .then((scripts) => {
     const formattedCount = String(scripts.length).padStart(2, '0');
     count.textContent = formattedCount;
-    publishedCount.textContent = formattedCount;
+    publishedCount.textContent = `${formattedCount} scripts`;
     if (!scripts.length) {
       grid.innerHTML = '<p class="empty-state">No scripts yet.</p>';
       return;
