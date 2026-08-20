@@ -60,7 +60,8 @@ body::before {
   width: 420px;
   height: 420px;
   pointer-events: none;
-  border: 1px solid rgba(224, 107, 79, .085);
+  background: rgba(224, 107, 79, .035);
+  border: 1px solid rgba(224, 107, 79, .14);
   transform: rotate(9deg);
   animation: ambient-drift 28s linear infinite;
   will-change: transform;
@@ -75,7 +76,8 @@ body::after {
   width: 330px;
   height: 330px;
   pointer-events: none;
-  border: 1px solid rgba(79, 120, 163, .065);
+  background: rgba(79, 120, 163, .028);
+  border: 1px solid rgba(79, 120, 163, .11);
   transform: rotate(-14deg);
   animation: ambient-drift-reverse 36s linear infinite;
   will-change: transform;
