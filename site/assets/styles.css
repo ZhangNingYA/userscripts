@@ -32,40 +32,43 @@ body {
   margin: 0;
   overflow-x: hidden;
   color: var(--ink);
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: radial-gradient(circle, rgba(23, 32, 28, .024) .65px, transparent .75px);
+  background-position: 0 0;
+  background-size: 38px 38px;
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
+  animation: paper-drift 90s linear infinite;
 }
 
 body::before {
   content: "";
   position: fixed;
-  top: 22vh;
-  right: -168px;
+  top: 14vh;
+  right: -230px;
   z-index: 0;
-  width: 250px;
-  height: 250px;
+  width: 420px;
+  height: 420px;
   pointer-events: none;
-  border: 1px solid rgba(224, 107, 79, .11);
-  transform: rotate(12deg);
-  animation: ambient-turn 28s ease-in-out infinite alternate;
+  border: 1px solid rgba(224, 107, 79, .05);
+  transform: rotate(9deg);
+  animation: ambient-drift 44s ease-in-out infinite;
 }
 
 body::after {
   content: "";
   position: fixed;
-  right: 9vw;
-  bottom: 12vh;
+  left: -190px;
+  bottom: 5vh;
   z-index: 0;
-  width: 46px;
-  height: 1px;
+  width: 330px;
+  height: 330px;
   pointer-events: none;
-  background: var(--coral);
-  box-shadow: 0 9px 0 rgba(79, 120, 163, .5), 0 18px 0 rgba(78, 128, 104, .45);
-  opacity: .4;
-  animation: signal-drift 12s ease-in-out infinite alternate;
+  border: 1px solid rgba(79, 120, 163, .04);
+  transform: rotate(-14deg);
+  animation: ambient-drift-reverse 52s ease-in-out infinite;
 }
 
 a {
@@ -686,24 +689,33 @@ footer {
   }
 }
 
-@keyframes ambient-turn {
+@keyframes paper-drift {
   to {
-    transform: translate(-24px, 18px) rotate(25deg);
+    background-position: 38px 38px;
+  }
+}
+
+@keyframes ambient-drift {
+  0%, 100% {
+    transform: translate(0, 0) rotate(9deg);
+  }
+  50% {
+    transform: translate(-34px, 24px) rotate(18deg);
+  }
+}
+
+@keyframes ambient-drift-reverse {
+  0%, 100% {
+    transform: translate(0, 0) rotate(-14deg);
+  }
+  50% {
+    transform: translate(28px, -22px) rotate(-5deg);
   }
 }
 
 @keyframes edition-marker {
   to {
     left: calc(100% - 5px);
-  }
-}
-
-@keyframes signal-drift {
-  from {
-    transform: translateX(0) rotate(0deg);
-  }
-  to {
-    transform: translateX(-22px) rotate(-3deg);
   }
 }
 
@@ -770,13 +782,19 @@ footer {
 
 @media (max-width: 560px) {
   body::before {
-    display: none;
+    top: 18vh;
+    right: -245px;
+    width: 340px;
+    height: 340px;
+    opacity: .5;
   }
 
   body::after {
-    right: 15px;
-    bottom: 18vh;
-    opacity: .25;
+    left: -230px;
+    bottom: 7vh;
+    width: 300px;
+    height: 300px;
+    opacity: .45;
   }
 
   .topbar {
