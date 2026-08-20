@@ -30,9 +30,26 @@ html::before {
   inset: -38px;
   z-index: 0;
   pointer-events: none;
-  background-image: radial-gradient(circle, rgba(23, 32, 28, .04) .7px, transparent .82px);
+  background-image: radial-gradient(circle, rgba(23, 32, 28, .045) .75px, transparent .88px);
   background-size: 38px 38px;
-  animation: paper-drift 18s linear infinite;
+  animation: paper-drift 14s linear infinite;
+  will-change: transform;
+}
+
+html::after {
+  content: "01  02  03";
+  position: fixed;
+  right: 8vw;
+  bottom: 2vh;
+  z-index: 0;
+  pointer-events: none;
+  color: rgba(23, 32, 28, .028);
+  font-family: var(--serif);
+  font-size: 72px;
+  line-height: 1;
+  white-space: nowrap;
+  word-spacing: 32px;
+  animation: folio-drift 32s linear infinite;
   will-change: transform;
 }
 
@@ -54,32 +71,34 @@ body {
 body::before {
   content: "";
   position: fixed;
-  top: 14vh;
-  right: -230px;
+  top: 10vh;
+  right: -190px;
   z-index: 0;
-  width: 420px;
-  height: 420px;
+  width: 380px;
+  height: 520px;
   pointer-events: none;
-  background: rgba(224, 107, 79, .035);
-  border: 1px solid rgba(224, 107, 79, .14);
-  transform: rotate(9deg);
-  animation: ambient-drift 28s linear infinite;
+  background: rgba(224, 107, 79, .075);
+  border: 1px solid rgba(224, 107, 79, .24);
+  box-shadow: inset 0 0 0 14px rgba(248, 249, 247, .55), inset 0 0 0 15px rgba(224, 107, 79, .08);
+  transform: rotate(7deg);
+  animation: ambient-drift 22s linear infinite;
   will-change: transform;
 }
 
 body::after {
   content: "";
   position: fixed;
-  left: -190px;
-  bottom: 5vh;
+  left: -145px;
+  bottom: 7vh;
   z-index: 0;
-  width: 330px;
-  height: 330px;
+  width: 280px;
+  height: 390px;
   pointer-events: none;
-  background: rgba(79, 120, 163, .028);
-  border: 1px solid rgba(79, 120, 163, .11);
-  transform: rotate(-14deg);
-  animation: ambient-drift-reverse 36s linear infinite;
+  background: rgba(79, 120, 163, .06);
+  border: 1px solid rgba(79, 120, 163, .19);
+  box-shadow: inset 0 0 0 12px rgba(248, 249, 247, .56), inset 0 0 0 13px rgba(79, 120, 163, .07);
+  transform: rotate(-11deg);
+  animation: ambient-drift-reverse 27s linear infinite;
   will-change: transform;
 }
 
@@ -709,31 +728,46 @@ footer {
 
 @keyframes ambient-drift {
   0%, 100% {
-    transform: translate(0, 0) rotate(9deg);
+    transform: translate3d(0, 0, 0) rotate(7deg);
   }
   25% {
-    transform: translate(-42px, 16px) rotate(13deg);
+    transform: translate3d(-34px, 14px, 0) rotate(10deg);
   }
   50% {
-    transform: translate(-56px, 48px) rotate(20deg);
+    transform: translate3d(-46px, 48px, 0) rotate(14deg);
   }
   75% {
-    transform: translate(-14px, 36px) rotate(15deg);
+    transform: translate3d(-10px, 34px, 0) rotate(11deg);
   }
 }
 
 @keyframes ambient-drift-reverse {
   0%, 100% {
-    transform: translate(0, 0) rotate(-14deg);
+    transform: translate3d(0, 0, 0) rotate(-11deg);
   }
   25% {
-    transform: translate(28px, -34px) rotate(-9deg);
+    transform: translate3d(24px, -32px, 0) rotate(-7deg);
   }
   50% {
-    transform: translate(52px, -16px) rotate(-3deg);
+    transform: translate3d(48px, -12px, 0) rotate(-3deg);
   }
   75% {
-    transform: translate(22px, 16px) rotate(-8deg);
+    transform: translate3d(20px, 20px, 0) rotate(-6deg);
+  }
+}
+
+@keyframes folio-drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-30px, -10px, 0);
+  }
+  50% {
+    transform: translate3d(-56px, 4px, 0);
+  }
+  75% {
+    transform: translate3d(-22px, 14px, 0);
   }
 }
 
@@ -805,20 +839,24 @@ footer {
 }
 
 @media (max-width: 560px) {
+  html::after {
+    display: none;
+  }
+
   body::before {
-    top: 18vh;
-    right: -245px;
-    width: 340px;
-    height: 340px;
-    opacity: .75;
+    top: 14vh;
+    right: -295px;
+    width: 330px;
+    height: 460px;
+    opacity: .9;
   }
 
   body::after {
-    left: -230px;
-    bottom: 7vh;
-    width: 300px;
-    height: 300px;
-    opacity: .68;
+    left: -250px;
+    bottom: 8vh;
+    width: 280px;
+    height: 370px;
+    opacity: .85;
   }
 
   .topbar {
