@@ -90,20 +90,15 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function scriptVisual(slug, className) {
-  return `<div class="${className} script-visual-${escapeHtml(slug)}" aria-hidden="true"></div>`;
-}
-
-function detailPage(script) {
+function detailPage(script, index) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const siteRows = script.targets.length
-    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.display)}</small></span></a></li>`).join('')
+    ? script.targets.map((target, targetIndex) => `<li><span class="site-index">${String(targetIndex + 1).padStart(2, '0')}</span><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.display)}</small></a></li>`).join('')
     : '<li>No supported sites declared</li>';
   const primaryTarget = script.targets[0];
   const primarySiteLink = primaryTarget
     ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(primaryTarget.display)}</a>`
     : '';
-  const detailVisual = scriptVisual(script.slug, 'detail-visual');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -111,32 +106,31 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=16">
+  <link rel="stylesheet" href="../../assets/styles.css?v=17">
 </head>
 <body>
-  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Source</a></div></header>
+  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><nav class="topnav" aria-label="Primary navigation"><a href="../../#catalog">Scripts</a><a href="https://github.com/ZhangNingYA/userscripts">Source</a></nav></div></header>
   <main class="page-shell detail-shell">
-    <a class="back-link" href="../../"><span aria-hidden="true">←</span> Back</a>
+    <a class="back-link" href="../../">All scripts</a>
     <article class="detail-article">
       <header class="detail-heading">
-        <p class="section-label">v${escapeHtml(script.version)}</p>
+        <p class="eyebrow">Script ${String(index + 1).padStart(2, '0')} / v${escapeHtml(script.version)}</p>
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
           <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install</a>
           ${primarySiteLink}
-          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Text copy</a>
+          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">Text copy</a>
         </div>
       </header>
-      ${detailVisual}
       <div class="detail-grid">
-        <section class="runs-on"><div class="section-copy"><h2>Sites</h2><p>${script.targets.length}</p></div><ul class="site-list">${siteRows}</ul></section>
+        <section class="runs-on"><div class="section-heading"><h2>Sites</h2><p>${String(script.targets.length).padStart(2, '0')} supported</p></div><ul class="site-list">${siteRows}</ul></section>
         <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
-        <section><h2>Updates</h2><p>Checked automatically.</p></section>
+        <section class="update-section"><h2>Updates</h2><p>Checked automatically by your userscript manager.</p></section>
       </div>
     </article>
   </main>
-  <footer><span>Userscripts</span></footer>
+  <footer><span>Userscripts</span><a href="https://github.com/ZhangNingYA/userscripts">Source</a></footer>
 </body>
 </html>`;
 }
@@ -165,7 +159,7 @@ for (const folder of folders) {
   await mkdir(targetFolder, { recursive: true });
   await copyFile(sourceFile, path.join(targetFolder, filename));
   await copyFile(sourceFile, path.join(targetFolder, textFilename));
-  await writeFile(path.join(targetFolder, 'index.html'), detailPage(script));
+  await writeFile(path.join(targetFolder, 'index.html'), detailPage(script, catalog.length));
   catalog.push(script);
 }
 

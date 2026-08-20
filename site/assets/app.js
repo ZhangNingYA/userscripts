@@ -1,12 +1,10 @@
 const grid = document.querySelector('#script-grid');
 const count = document.querySelector('#script-count');
+const publishedCount = document.querySelector('#published-count');
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
-
-const scriptVisual = (slug, detailUrl) => `
-  <a class="script-visual script-visual-${encodeURIComponent(slug)}" href="${detailUrl}" tabindex="-1" aria-hidden="true"></a>`;
 
 const cleanTargetDisplay = (value) => String(value ?? '')
   .replace(/\/\*+$/, '')
@@ -22,25 +20,27 @@ fetch(catalogUrl, { cache: 'no-store' })
     return response.json();
   })
   .then((scripts) => {
-    count.textContent = String(scripts.length);
+    const formattedCount = String(scripts.length).padStart(2, '0');
+    count.textContent = formattedCount;
+    publishedCount.textContent = formattedCount;
     if (!scripts.length) {
       grid.innerHTML = '<p class="empty-state">No scripts yet.</p>';
       return;
     }
-    grid.innerHTML = scripts.map((script) => {
+    grid.innerHTML = scripts.map((script, index) => {
       const target = script.targets && script.targets[0];
       const extraTargets = Math.max(0, (script.targets?.length || 0) - 1);
       const detailUrl = `scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}`;
       const targetLink = target
-        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(cleanTargetDisplay(target.display || target.hostname))}</span>${extraTargets ? `<small>+${extraTargets}</small>` : ''}</a>`
+        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cleanTargetDisplay(target.display || target.hostname))}</a>${extraTargets ? `<span class="extra-sites">+${extraTargets} sites</span>` : ''}`
         : '';
       return `
-      <article class="script-entry">
-        ${scriptVisual(script.slug, detailUrl)}
+      <article class="script-entry accent-${(index % 3) + 1}">
+        <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
-          <div class="script-heading"><h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3><span class="script-version">v${escapeHtml(script.version)}</span></div>
+          <div class="script-meta"><span>v${escapeHtml(script.version)}</span>${targetLink}</div>
+          <h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
-          ${targetLink}
         </div>
         <div class="entry-actions">
           <a class="secondary-button" href="${detailUrl}">Details</a>
@@ -51,6 +51,7 @@ fetch(catalogUrl, { cache: 'no-store' })
   })
   .catch((error) => {
     count.textContent = 'Unavailable';
+    publishedCount.textContent = '--';
     grid.innerHTML = '<p class="empty-state">Catalog unavailable.</p>';
     console.error(error);
   });
