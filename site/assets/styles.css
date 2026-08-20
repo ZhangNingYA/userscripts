@@ -1746,11 +1746,15 @@ footer {
 
 .intro {
   max-width: 700px;
-  padding-top: 66px;
+  padding-top: 58px;
 }
 
 .intro > p:last-child {
-  max-width: 670px;
+  max-width: 540px;
+}
+
+.intro h1 {
+  margin-top: 0;
 }
 
 .section-heading span {
@@ -1776,7 +1780,7 @@ footer {
   --card-base: rgba(86, 101, 232, .22);
   --card-shelf: #f5f6ff;
   --card-shelf-line: #e2e5fb;
-  min-height: 382px;
+  min-height: 354px;
   overflow: hidden;
   background: var(--surface);
   border-color: rgba(214, 218, 230, .96);
@@ -1887,7 +1891,7 @@ footer {
 
 .script-summary > p:last-of-type {
   margin-top: 9px;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .script-meta {
@@ -2089,7 +2093,7 @@ footer {
   .script-entry:first-child,
   .script-entry:nth-child(2),
   .script-entry:nth-child(3n) {
-    min-height: 372px;
+    min-height: 354px;
     box-shadow: 0 14px 30px rgba(37, 39, 57, .1), 0 3px 9px rgba(37, 39, 57, .04), inset 0 1px 0 #ffffff;
   }
 
