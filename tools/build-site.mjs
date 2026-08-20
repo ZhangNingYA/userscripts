@@ -87,7 +87,7 @@ function escapeHtml(value) {
 }
 
 function scriptVisual(slug, className) {
-  return `<div class="${className} script-visual-${escapeHtml(slug)}" aria-hidden="true"><span class="visual-rail"></span><span class="visual-line visual-line-one"></span><span class="visual-line visual-line-two"></span><span class="visual-line visual-line-three"></span><span class="visual-tile visual-tile-one"></span><span class="visual-tile visual-tile-two"></span><span class="visual-dot visual-dot-one"></span><span class="visual-dot visual-dot-two"></span></div>`;
+  return `<div class="${className} script-visual-${escapeHtml(slug)}" aria-hidden="true"></div>`;
 }
 
 function detailPage(script) {
@@ -107,32 +107,32 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=12">
+  <link rel="stylesheet" href="../../assets/styles.css?v=13">
 </head>
 <body>
-  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Repository <span aria-hidden="true">↗</span></a></div></header>
+  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Source code <span aria-hidden="true">↗</span></a></div></header>
   <main class="page-shell detail-shell">
-    <a class="back-link" href="../../"><span aria-hidden="true">←</span> All scripts</a>
+    <a class="back-link" href="../../"><span aria-hidden="true">←</span> Back to scripts</a>
     <article class="detail-article">
       <header class="detail-heading">
-        <p class="section-label">Userscript <span aria-hidden="true">/</span> Version ${escapeHtml(script.version)}</p>
+        <p class="section-label">Userscript <span aria-hidden="true">•</span> Version ${escapeHtml(script.version)}</p>
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
-          <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install .user.js</a>
+          <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install script <span aria-hidden="true">↓</span></a>
           ${primarySiteLink}
-          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Download plain text</a>
+          <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Plain-text copy</a>
         </div>
       </header>
       ${detailVisual}
       <div class="detail-grid">
-        <section class="runs-on"><div class="section-copy"><h2>Runs on</h2><p>${script.targets.length} supported ${script.targets.length === 1 ? 'site' : 'sites'}</p></div><ul class="site-list">${siteRows}</ul></section>
-        <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
-        <section><h2>Updates</h2><p>Your userscript manager checks the published version automatically through the script's update URL.</p></section>
+        <section class="runs-on"><div class="section-copy"><h2>Compatible sites</h2><p>${script.targets.length} supported ${script.targets.length === 1 ? 'site' : 'sites'}</p></div><ul class="site-list">${siteRows}</ul></section>
+        <section><h2>Downloads</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Plain text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
+        <section><h2>Automatic updates</h2><p>Your userscript manager checks the published update URL and installs new versions when they are available.</p></section>
       </div>
     </article>
   </main>
-  <footer><span>Userscripts</span><span>Public source, no embedded secrets</span></footer>
+  <footer><span>Userscripts</span><span>Open source, with no embedded secrets</span></footer>
 </body>
 </html>`;
 }
