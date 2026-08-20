@@ -8,6 +8,11 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const scriptVisual = (slug, detailUrl) => `
   <a class="script-visual script-visual-${encodeURIComponent(slug)}" href="${detailUrl}" tabindex="-1" aria-hidden="true"></a>`;
 
+const cleanTargetDisplay = (value) => String(value ?? '')
+  .replace(/\/\*+$/, '')
+  .replace(/\*+$/, '')
+  .replace(/\/$/, '');
+
 const catalogUrl = new URL('./catalog.json', window.location.href);
 catalogUrl.searchParams.set('v', String(Date.now()));
 
@@ -27,20 +32,19 @@ fetch(catalogUrl, { cache: 'no-store' })
       const extraTargets = Math.max(0, (script.targets?.length || 0) - 1);
       const detailUrl = `scripts/${encodeURIComponent(script.slug)}/?v=${encodeURIComponent(script.version)}`;
       const targetLink = target
-        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(target.display || target.hostname)}</span>${extraTargets ? `<small>+${extraTargets}</small>` : ''}<span aria-hidden="true">↗</span></a>`
+        ? `<a class="script-site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(cleanTargetDisplay(target.display || target.hostname))}</span>${extraTargets ? `<small>+${extraTargets}</small>` : ''}</a>`
         : '';
       return `
       <article class="script-entry">
         ${scriptVisual(script.slug, detailUrl)}
         <div class="script-summary">
-          <p class="script-meta">v${escapeHtml(script.version)}</p>
-          <h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3>
+          <div class="script-heading"><h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3><span class="script-version">v${escapeHtml(script.version)}</span></div>
           <p>${escapeHtml(script.description)}</p>
           ${targetLink}
         </div>
         <div class="entry-actions">
-          <a class="secondary-button" href="${detailUrl}">Details <span aria-hidden="true">→</span></a>
-          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}?v=${encodeURIComponent(script.version)}">Install <span aria-hidden="true">↓</span></a>
+          <a class="secondary-button" href="${detailUrl}">Details</a>
+          <a class="primary-button" href="scripts/${encodeURIComponent(script.slug)}/${encodeURIComponent(script.filename)}?v=${encodeURIComponent(script.version)}">Install</a>
         </div>
       </article>`;
     }).join('');

@@ -36,6 +36,10 @@ function titleCaseHostname(hostname) {
     .join(' ');
 }
 
+function cleanTargetDisplay(value) {
+  return String(value).replace(/\/\*+$/, '').replace(/\*+$/, '').replace(/\/$/, '');
+}
+
 function targetsFromMatches(matches) {
   const targets = new Map();
   for (const match of matches) {
@@ -50,7 +54,7 @@ function targetsFromMatches(matches) {
     targets.set(key, {
       label: presentation.label || titleCaseHostname(hostname),
       hostname: new URL(url).hostname.replace(/^www\./, ''),
-      display: presentation.display || `${hostname}${matchPath}`,
+      display: cleanTargetDisplay(presentation.display || `${hostname}${matchPath}`),
       url
     });
   }
@@ -93,11 +97,11 @@ function scriptVisual(slug, className) {
 function detailPage(script) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const siteRows = script.targets.length
-    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.display)}</small></span><span class="external-mark" aria-hidden="true">↗</span></a></li>`).join('')
+    ? script.targets.map((target) => `<li><a class="site-link" href="${escapeHtml(target.url)}" target="_blank" rel="noopener noreferrer"><span><strong>${escapeHtml(target.label)}</strong><small>${escapeHtml(target.display)}</small></span></a></li>`).join('')
     : '<li>No supported sites declared</li>';
   const primaryTarget = script.targets[0];
   const primarySiteLink = primaryTarget
-    ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(primaryTarget.display)} <span aria-hidden="true">↗</span></a>`
+    ? `<a class="site-button" href="${escapeHtml(primaryTarget.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(primaryTarget.display)}</a>`
     : '';
   const detailVisual = scriptVisual(script.slug, 'detail-visual');
   return `<!doctype html>
@@ -107,10 +111,10 @@ function detailPage(script) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=15">
+  <link rel="stylesheet" href="../../assets/styles.css?v=16">
 </head>
 <body>
-  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Source <span aria-hidden="true">↗</span></a></div></header>
+  <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><a class="quiet-link" href="https://github.com/ZhangNingYA/userscripts">Source</a></div></header>
   <main class="page-shell detail-shell">
     <a class="back-link" href="../../"><span aria-hidden="true">←</span> Back</a>
     <article class="detail-article">
@@ -119,7 +123,7 @@ function detailPage(script) {
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
-          <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install <span aria-hidden="true">↓</span></a>
+          <a class="primary-button" href="./${encodeURIComponent(script.filename)}${versionQuery}">Install</a>
           ${primarySiteLink}
           <a class="text-download" href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}"><span class="file-badge" aria-hidden="true">TXT</span>Text copy</a>
         </div>
