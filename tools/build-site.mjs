@@ -90,6 +90,93 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function tripDetailPage(place, index, total) {
+  const typeName = place.kind === 'commerce' ? '商圈' : '景点';
+  const highlights = place.highlights.map((item) => `<li><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></li>`).join('');
+  const history = place.history.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('');
+  const route = place.route.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const interesting = place.interesting.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const practical = [
+    ['营业时间', place.hours],
+    ['预约与入场', place.booking],
+    ['价格参考', place.price],
+    ['更实惠的方式', place.saving],
+    ['从徐州站出发', place.transport]
+  ].map(([label, value]) => `<li><strong>${escapeHtml(label)}</strong><p>${escapeHtml(value)}</p></li>`).join('');
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f3f5f1">
+  <meta name="description" content="${escapeHtml(place.name)}：${escapeHtml(place.summary)}">
+  <title>${escapeHtml(place.name)} · 徐州旅行图</title>
+  <link rel="stylesheet" href="../../assets/trip.css?v=4">
+</head>
+<body class="trip-detail">
+  <header class="site-header">
+    <a class="wordmark" href="../../" aria-label="返回徐州旅行图地图">
+      <span class="wordmark-seal" aria-hidden="true">徐</span>
+      <span><strong>徐州</strong><small>XUZHOU TRIP</small></span>
+    </a>
+    <nav class="detail-nav" aria-label="页面导航"><a href="../../#top">回到地图</a><a href="../../places/">地点目录</a></nav>
+  </header>
+
+  <main class="detail-main">
+    <article>
+      <figure class="detail-hero">
+        <img src="../../assets/images/${encodeURIComponent(place.image)}" alt="${escapeHtml(place.imageAlt)}" loading="eager" decoding="async">
+        <figcaption class="detail-hero-copy">
+          <p class="detail-eyebrow">${typeName} · ${escapeHtml(place.category)} · ${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}</p>
+          <h1>${escapeHtml(place.name)}</h1>
+          <p class="detail-lede">${escapeHtml(place.summary)}</p>
+        </figcaption>
+      </figure>
+      <p class="detail-caption">${escapeHtml(place.imageCaption)}</p>
+
+      <dl class="detail-facts">
+        <div class="fact"><dt>方向</dt><dd>${escapeHtml(place.direction)}</dd></div>
+        <div class="fact"><dt>建议停留</dt><dd>${escapeHtml(place.duration)}</dd></div>
+        <div class="fact"><dt>地点类型</dt><dd>${typeName} · ${escapeHtml(place.category)}</dd></div>
+        <div class="fact"><dt>出行方式</dt><dd>地铁 / 打车为主</dd></div>
+      </dl>
+
+      <div class="detail-layout">
+        <div>
+          <section class="detail-section" aria-labelledby="highlights-heading">
+            <h2 id="highlights-heading">核心看点</h2>
+            <ul class="highlight-list">${highlights}</ul>
+          </section>
+          <section class="detail-section" aria-labelledby="history-heading">
+            <h2 id="history-heading">历史与背景</h2>
+            ${history}
+          </section>
+          <section class="detail-section" aria-labelledby="route-heading">
+            <h2 id="route-heading">怎么游 / 怎么逛</h2>
+            <ol class="route-list">${route}</ol>
+          </section>
+        </div>
+        <aside class="detail-aside">
+          <p class="aside-note"><strong>出发前核对</strong>开放时间、价格、预约规则、活动和交通都可能临时变化。${typeName === '景点' ? '景区当天的入馆、检票和项目开放状态尤其重要。' : '商场的门店营业时间、优惠券和停车规则也可能分别调整。'}出发当天请以官方公告为准。</p>
+          <section class="detail-section" aria-labelledby="practical-heading">
+            <h2 id="practical-heading">实用信息</h2>
+            <ul class="practical-list">${practical}</ul>
+          </section>
+          <section class="detail-section" aria-labelledby="interesting-heading">
+            <h2 id="interesting-heading">有趣的地点</h2>
+            <ul class="interesting-list">${interesting}</ul>
+          </section>
+        </aside>
+      </div>
+
+      <p class="image-credit">图片：<a href="${escapeHtml(place.imageSource)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.imageCredit)}</a>。图片说明和授权信息来自资料页；使用时请以原始页面为准。</p>
+    </article>
+  </main>
+  <footer><strong>徐州旅行图</strong><p>这是个人旅行资料页；示意地图不是导航，运营信息请在出发当天复核。</p></footer>
+</body>
+</html>`;
+}
+
 function detailPage(script, index) {
   const versionQuery = `?v=${encodeURIComponent(script.version)}`;
   const siteRows = script.targets.length
@@ -137,6 +224,45 @@ function detailPage(script, index) {
 
 await rm(outputRoot, { recursive: true, force: true });
 await cp(siteRoot, outputRoot, { recursive: true });
+
+const tripDataFile = path.join(siteRoot, 'trip', 'assets', 'places.json');
+let tripPlaces;
+try {
+  tripPlaces = JSON.parse(await readFile(tripDataFile, 'utf8'));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
+if (tripPlaces) {
+  if (!Array.isArray(tripPlaces) || tripPlaces.length !== 15) {
+    throw new Error('site/trip/assets/places.json must contain exactly 15 places');
+  }
+  const tripSlugs = new Set();
+  for (const place of tripPlaces) {
+    if (!place || !/^[a-z0-9-]+$/.test(place.slug) || tripSlugs.has(place.slug)) {
+      throw new Error(`Invalid or duplicate trip place slug: ${place?.slug || '(empty)'}`);
+    }
+    tripSlugs.add(place.slug);
+    if (!/^[a-z0-9._-]+$/.test(place.image)) throw new Error(`Invalid trip image filename: ${place.image}`);
+    await readFile(path.join(siteRoot, 'trip', 'assets', 'images', place.image));
+    for (const key of ['name', 'summary', 'direction', 'duration', 'imageAlt', 'imageCaption', 'imageCredit', 'imageSource', 'hours', 'booking', 'price', 'saving', 'transport']) {
+      if (!String(place[key] || '').trim()) throw new Error(`${place.slug} is missing ${key}`);
+    }
+    for (const key of ['highlights', 'history', 'route', 'interesting']) {
+      if (!Array.isArray(place[key]) || place[key].length === 0) throw new Error(`${place.slug} is missing ${key}`);
+    }
+  }
+  const tripPlacesRoot = path.join(outputRoot, 'trip', 'places');
+  await mkdir(tripPlacesRoot, { recursive: true });
+  for (const [index, place] of tripPlaces.entries()) {
+    const placeRoot = path.join(tripPlacesRoot, place.slug);
+    await mkdir(placeRoot, { recursive: true });
+    await writeFile(path.join(placeRoot, 'index.html'), tripDetailPage(place, index, tripPlaces.length));
+  }
+  const tripDirectoryRows = tripPlaces.map((place, index) => `<li><a href="./${encodeURIComponent(place.slug)}/"><span>${String(index + 1).padStart(2, '0')}</span><strong>${escapeHtml(place.name)}</strong><small>${escapeHtml(place.kind === 'commerce' ? '商圈' : '景点')} · ${escapeHtml(place.category)}</small></a></li>`).join('');
+  await writeFile(path.join(tripPlacesRoot, 'index.html'), `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f5f1"><title>地点目录 · 徐州旅行图</title><link rel="stylesheet" href="../../assets/trip.css?v=4"></head>
+<body class="trip-detail"><header class="site-header"><a class="wordmark" href="../../"><span class="wordmark-seal" aria-hidden="true">徐</span><span><strong>徐州</strong><small>XUZHOU TRIP</small></span></a><nav class="detail-nav" aria-label="页面导航"><a href="../../#top">回到地图</a></nav></header><main class="detail-main"><article><h1>地点目录</h1><p class="detail-lede">从地图标记进入每个景点和商圈的图片资料与行程参考。</p><ul class="interesting-list">${tripDirectoryRows}</ul></article></main><footer><strong>徐州旅行图</strong></footer></body></html>`);
+}
 
 const catalog = [];
 const folders = (await readdir(scriptsRoot, { withFileTypes: true }))

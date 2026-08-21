@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f3f5f1">
+  <meta name="description" content="从徐州站出发，查看徐州十大景点、主要商圈和地铁方向的旅行示意图。">
+  <title>徐州旅行图</title>
+  <link rel="stylesheet" href="./assets/trip.css?v=4">
+</head>
+<body class="map-page">
+  <header class="site-header">
+    <a class="wordmark" href="#top" aria-label="返回徐州旅行图顶部">
+      <span class="wordmark-seal" aria-hidden="true">徐</span>
+      <span><strong>徐州</strong><small>XUZHOU TRIP</small></span>
+    </a>
+    <div class="base-status">
+      <span aria-hidden="true">⌂</span> 徐州站 · 住宿
+    </div>
+  </header>
+
+  <main>
+    <section class="map-hero" id="top" aria-labelledby="map-title">
+      <div class="map-frame" id="map-frame">
+        <div class="map-heading">
+          <p>TOP 10 · CITY OVERVIEW</p>
+          <h1 id="map-title">徐州旅行图</h1>
+          <span>点击景点或商圈查看资料</span>
+        </div>
+
+        <div class="line-legend" aria-label="地铁线路颜色">
+          <span><i class="line-chip line-1">1</i>1号线</span>
+          <span><i class="line-chip line-2">2</i>2号线</span>
+          <span><i class="line-chip line-3">3</i>3号线</span>
+          <span><i class="line-chip line-6">6</i>6号线</span>
+        </div>
+
+        <div class="map-canvas" id="map-canvas" aria-label="徐州景点、商圈和地铁方向示意图">
+          <div class="area area-north">鼓楼</div>
+          <div class="area area-west">泉山</div>
+          <div class="area area-east">云龙</div>
+          <div class="area area-jiawang">贾汪</div>
+
+          <div class="park park-yunlong" aria-label="云龙山山体范围示意"><span>云龙山</span></div>
+          <div class="park park-panan" aria-label="潘安湖湿地范围示意"></div>
+          <div class="water water-lake" aria-label="云龙湖"><span>云龙湖</span></div>
+          <div class="water water-panan" aria-label="潘安湖"><span>潘安湖</span></div>
+
+          <div class="metro-network" aria-label="徐州地铁线路示意">
+            <svg class="metro-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <polyline class="metro-path metro-path-1" points="36,52 83,52"></polyline>
+              <polyline class="metro-path metro-path-2" points="40,43 40,52 43,61 48,73 48,91"></polyline>
+              <polyline class="metro-path metro-path-3" points="52,42 52,52 52,64 48,73 47,92"></polyline>
+              <polyline class="metro-path metro-path-6" points="45,91 57,76 69,64 83,52"></polyline>
+            </svg>
+            <div id="metro-stations"></div>
+          </div>
+
+          <div class="compass" aria-label="上方为北">
+            <span>N</span>
+            <i aria-hidden="true"></i>
+          </div>
+
+          <div class="lodging-marker" aria-label="住宿：徐州站，地铁1号线和3号线换乘站">
+            <span class="lodging-dot" aria-hidden="true">住</span>
+            <span class="lodging-label"><strong>徐州站</strong><small>住宿 · <i class="line-chip line-1">1</i><i class="line-chip line-3">3</i></small></span>
+          </div>
+
+          <div id="map-markers"></div>
+          <div id="commerce-markers"></div>
+        </div>
+
+        <div class="map-key">
+          <span><i class="key-home" aria-hidden="true"></i>住宿</span>
+          <span><i class="key-spot" aria-hidden="true"></i>景点</span>
+          <span><i class="key-metro" aria-hidden="true"></i>地铁</span>
+          <span><i class="key-commerce" aria-hidden="true"></i>商圈</span>
+          <small>真实方向 · 示意比例 · 非导航地图</small>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="place-dialog" id="place-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-panel">
+      <button class="dialog-close" type="button" aria-label="关闭地点介绍">
+        <span aria-hidden="true">×</span>
+      </button>
+      <figure class="dialog-media">
+        <img id="dialog-image" src="" alt="">
+        <figcaption id="dialog-caption"></figcaption>
+      </figure>
+      <div class="dialog-copy">
+        <p class="dialog-category" id="dialog-category"></p>
+        <h2 id="dialog-title"></h2>
+        <p class="dialog-summary" id="dialog-summary"></p>
+        <dl class="dialog-meta">
+          <div><dt>方位</dt><dd id="dialog-direction"></dd></div>
+          <div><dt>建议停留</dt><dd id="dialog-duration"></dd></div>
+        </dl>
+        <a class="detail-button" id="dialog-link" href="">查看完整攻略 <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="load-status" id="load-status" role="status" hidden></div>
+  <script src="./assets/trip.js?v=4" defer></script>
+</body>
+</html>
