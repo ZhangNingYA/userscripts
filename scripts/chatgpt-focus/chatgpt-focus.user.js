@@ -4,6 +4,7 @@
 // @name:en      ChatGPT Focus
 // @namespace    https://scripts.fulafu.com/
 // @version      1.7.0
+// @lastUpdated  2026-08-17 18:11
 // @description  A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.
 // @description:zh-CN 为 ChatGPT 提供最近对话、移动导航、正文阅读排版和字号控制，同时保留模型、附件与下载功能。
 // @description:en A text-first ChatGPT reading layout with recent chats, mobile navigation, reading controls, and sensible model defaults.

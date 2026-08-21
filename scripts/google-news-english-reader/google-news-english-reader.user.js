@@ -4,6 +4,7 @@
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
 // @version      1.2.1
+// @lastUpdated  2026-08-19 20:10
 // @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
 // @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.

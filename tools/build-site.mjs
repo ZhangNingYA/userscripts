@@ -76,6 +76,7 @@ function parseMetadata(source) {
   return {
     name: first('name:en', first('name')),
     version: first('version'),
+    updatedAt: first('lastUpdated'),
     description: first('description:en', first('description')),
     author: first('author', 'ZhangNingYA'),
     matches: metadata.match || [],
@@ -225,7 +226,7 @@ function detailPage(script, index) {
     <a class="back-link" href="../../">All scripts</a>
     <article class="detail-article">
       <header class="detail-heading">
-        <p class="eyebrow">Script ${String(index + 1).padStart(2, '0')} / v${escapeHtml(script.version)}</p>
+        <p class="eyebrow">Script ${String(index + 1).padStart(2, '0')} / v${escapeHtml(script.version)} / Updated ${escapeHtml(script.updatedAt)}</p>
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
@@ -237,7 +238,7 @@ function detailPage(script, index) {
       <div class="detail-grid">
         <section class="runs-on"><div class="section-heading"><h2>Sites</h2><p>${String(script.targets.length).padStart(2, '0')} supported</p></div><ul class="site-list">${siteRows}</ul></section>
         <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
-        <section class="update-section"><h2>Updates</h2><p>Checked automatically by your userscript manager.</p></section>
+        <section class="update-section"><h2>Updates</h2><p><strong>Last updated</strong><br><time>${escapeHtml(script.updatedAt)}</time></p><p>Checked automatically by your userscript manager.</p></section>
       </div>
     </article>
   </main>
@@ -309,7 +310,10 @@ for (const folder of folders) {
   const sourceFile = path.join(sourceFolder, filename);
   execFileSync(process.execPath, ['--check', sourceFile], { stdio: 'inherit' });
   const metadata = parseMetadata(await readFile(sourceFile, 'utf8'));
-  if (!metadata.name || !metadata.version || !metadata.description) throw new Error(`${filename} is missing required metadata`);
+  if (!metadata.name || !metadata.version || !metadata.description || !metadata.updatedAt) throw new Error(`${filename} is missing required metadata`);
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(metadata.updatedAt)) {
+    throw new Error(`${filename} has an invalid @lastUpdated; expected YYYY-MM-DD HH:mm`);
+  }
   const script = { slug: folder.name, filename, textFilename, ...metadata };
   script.targets = targetsFromMatches(script.matches);
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
