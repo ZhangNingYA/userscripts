@@ -27,32 +27,31 @@ html {
 html::before {
   content: "";
   position: fixed;
-  inset: -36px -72px;
+  inset: -18vh -20vw;
   z-index: 0;
   pointer-events: none;
-  background-image: radial-gradient(circle, rgba(23, 32, 28, .052) .7px, transparent .86px);
-  background-size: 36px 36px;
-  animation: dot-field-right 16s linear infinite;
+  background-image:
+    linear-gradient(116deg, transparent 0 24%, rgba(78, 128, 104, .07) 24.12% 24.3%, transparent 24.48%),
+    linear-gradient(116deg, transparent 0 46%, rgba(224, 107, 79, .095) 46.12% 46.32%, transparent 46.52%),
+    linear-gradient(116deg, transparent 0 67%, rgba(79, 120, 163, .075) 67.12% 67.3%, transparent 67.5%);
+  background-size: 150% 150%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+  animation: contour-drift 28s ease-in-out infinite alternate;
   will-change: transform;
 }
 
 html::after {
   content: "";
   position: fixed;
-  top: 18vh;
-  left: -56px;
+  top: 26vh;
+  left: 0;
   z-index: 0;
-  width: calc(100% + 112px);
-  height: 128px;
+  width: min(560px, 62vw);
+  height: 2px;
   pointer-events: none;
-  background-image:
-    radial-gradient(circle, rgba(224, 107, 79, .45) 0 1.3px, transparent 1.6px),
-    radial-gradient(circle, rgba(224, 107, 79, .2) 0 .75px, transparent 1px);
-  background-position: 0 0, 24px 16px;
-  background-size: 48px 32px;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 24%, #000 76%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 24%, #000 76%, transparent);
-  animation: dot-stream-left 15s linear infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(224, 107, 79, .12) 17%, rgba(224, 107, 79, .45) 47%, rgba(224, 107, 79, .1) 78%, transparent 100%);
+  animation: signal-sweep 18s cubic-bezier(.45, .05, .55, .95) infinite;
   will-change: transform;
 }
 
@@ -74,42 +73,31 @@ body {
 body::before {
   content: "";
   position: fixed;
-  right: auto;
-  bottom: 20vh;
-  left: -64px;
+  right: 0;
+  bottom: 21vh;
+  left: auto;
   z-index: 0;
-  width: calc(100% + 128px);
-  height: 140px;
+  width: min(620px, 68vw);
+  height: 2px;
   pointer-events: none;
-  background-image:
-    radial-gradient(circle, rgba(79, 120, 163, .4) 0 1.2px, transparent 1.5px),
-    radial-gradient(circle, rgba(78, 128, 104, .3) 0 .9px, transparent 1.2px);
-  background-position: 0 0, 28px 18px;
-  background-size: 56px 36px;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
-  animation: dot-stream-right 23s linear infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(79, 120, 163, .1) 16%, rgba(79, 120, 163, .36) 45%, rgba(78, 128, 104, .3) 67%, transparent 100%);
+  animation: signal-sweep-reverse 24s cubic-bezier(.45, .05, .55, .95) infinite;
   will-change: transform;
 }
 
 body::after {
   content: "";
   position: fixed;
-  top: 56vh;
+  top: 57vh;
   right: auto;
   bottom: auto;
-  left: -144px;
+  left: 12vw;
   z-index: 0;
-  width: calc(100% + 288px);
-  height: 22px;
+  width: min(360px, 42vw);
+  height: 1px;
   pointer-events: none;
-  background-image:
-    radial-gradient(circle, rgba(224, 107, 79, .62) 0 2px, transparent 2.4px),
-    radial-gradient(circle, rgba(79, 120, 163, .58) 0 1.7px, transparent 2.1px),
-    radial-gradient(circle, rgba(78, 128, 104, .54) 0 1.8px, transparent 2.2px);
-  background-position: 0 center, 48px center, 96px center;
-  background-size: 144px 22px;
-  animation: signal-dots-left 12s linear infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(224, 107, 79, .28) 26%, rgba(79, 120, 163, .3) 60%, transparent 100%);
+  animation: trace-pulse 11s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -731,27 +719,57 @@ footer {
   }
 }
 
-@keyframes dot-field-right {
+@keyframes contour-drift {
+  from {
+    transform: translate3d(-1.6%, -1%, 0) rotate(-.35deg);
+  }
   to {
-    transform: translate3d(36px, 0, 0);
+    transform: translate3d(1.6%, 1%, 0) rotate(.35deg);
   }
 }
 
-@keyframes dot-stream-left {
-  to {
-    transform: translate3d(-48px, 0, 0);
+@keyframes signal-sweep {
+  0%, 8% {
+    opacity: 0;
+    transform: translate3d(-125%, 0, 0);
+  }
+  22% {
+    opacity: .9;
+  }
+  72% {
+    opacity: .65;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(225%, 0, 0);
   }
 }
 
-@keyframes dot-stream-right {
-  to {
-    transform: translate3d(56px, 0, 0);
+@keyframes signal-sweep-reverse {
+  0%, 8% {
+    opacity: 0;
+    transform: translate3d(125%, 0, 0);
+  }
+  22% {
+    opacity: .82;
+  }
+  72% {
+    opacity: .56;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-225%, 0, 0);
   }
 }
 
-@keyframes signal-dots-left {
-  to {
-    transform: translate3d(-144px, 0, 0);
+@keyframes trace-pulse {
+  0%, 100% {
+    opacity: .18;
+    transform: translate3d(-14vw, 0, 0) scaleX(.72);
+  }
+  50% {
+    opacity: .72;
+    transform: translate3d(18vw, 0, 0) scaleX(1);
   }
 }
 
@@ -824,28 +842,23 @@ footer {
 
 @media (max-width: 560px) {
   html::after {
-    top: 15vh;
-    height: 96px;
-    opacity: .82;
+    top: 22vh;
+    width: 78vw;
+    opacity: .78;
   }
 
   body::before {
-    right: auto;
+    right: -38vw;
     bottom: 24vh;
-    left: -64px;
-    width: calc(100% + 128px);
-    height: 104px;
-    opacity: .8;
+    width: 92vw;
+    opacity: .72;
   }
 
   body::after {
     top: 60vh;
-    right: auto;
-    bottom: auto;
-    left: -144px;
-    width: calc(100% + 288px);
-    height: 18px;
-    opacity: .78;
+    left: 8vw;
+    width: 68vw;
+    opacity: .68;
   }
 
   .topbar {
