@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f3f5f1">
   <meta name="description" content="从徐州站出发，查看徐州十大景点、主要商圈和地铁方向的旅行示意图。">
   <title>徐州旅行图</title>
-  <link rel="stylesheet" href="./assets/trip.css?v=4">
+  <link rel="stylesheet" href="./assets/trip.css?v=5">
 </head>
 <body class="map-page">
   <header class="site-header">
@@ -15,7 +15,7 @@
       <span><strong>徐州</strong><small>XUZHOU TRIP</small></span>
     </a>
     <div class="base-status">
-      <span aria-hidden="true">⌂</span> 徐州站 · 住宿
+      徐州站 · 行程起点
     </div>
   </header>
 
@@ -28,7 +28,7 @@
           <span>点击景点或商圈查看资料</span>
         </div>
 
-        <div class="line-legend" aria-label="地铁线路颜色">
+        <div class="line-legend" aria-label="地铁线路颜色" hidden>
           <span><i class="line-chip line-1">1</i>1号线</span>
           <span><i class="line-chip line-2">2</i>2号线</span>
           <span><i class="line-chip line-3">3</i>3号线</span>
@@ -46,7 +46,7 @@
           <div class="water water-lake" aria-label="云龙湖"><span>云龙湖</span></div>
           <div class="water water-panan" aria-label="潘安湖"><span>潘安湖</span></div>
 
-          <div class="metro-network" aria-label="徐州地铁线路示意">
+          <div class="metro-network" aria-label="徐州地铁线路示意" hidden>
             <svg class="metro-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <polyline class="metro-path metro-path-1" points="36,52 83,52"></polyline>
               <polyline class="metro-path metro-path-2" points="40,43 40,52 43,61 48,73 48,91"></polyline>
@@ -61,20 +61,19 @@
             <i aria-hidden="true"></i>
           </div>
 
-          <div class="lodging-marker" aria-label="住宿：徐州站，地铁1号线和3号线换乘站">
-            <span class="lodging-dot" aria-hidden="true">住</span>
-            <span class="lodging-label"><strong>徐州站</strong><small>住宿 · <i class="line-chip line-1">1</i><i class="line-chip line-3">3</i></small></span>
+          <div class="xuzhou-station-marker" aria-label="徐州站，地铁1号线和3号线换乘站">
+            <span class="xuzhou-station-dot" aria-hidden="true">站</span>
+            <span class="xuzhou-station-label"><strong>徐州站</strong><small><i class="line-chip line-1">1</i><i class="line-chip line-3">3</i></small></span>
           </div>
 
           <div id="map-markers"></div>
-          <div id="commerce-markers"></div>
+          <div id="commerce-markers" hidden></div>
         </div>
 
-        <div class="map-key">
-          <span><i class="key-home" aria-hidden="true"></i>住宿</span>
-          <span><i class="key-spot" aria-hidden="true"></i>景点</span>
-          <span><i class="key-metro" aria-hidden="true"></i>地铁</span>
-          <span><i class="key-commerce" aria-hidden="true"></i>商圈</span>
+        <div class="map-key" aria-label="地图显示图层">
+          <button class="layer-toggle layer-sights" type="button" data-layer="sights" aria-pressed="true"><i class="key-spot" aria-hidden="true"></i>景点</button>
+          <button class="layer-toggle layer-metro" type="button" data-layer="metro" aria-pressed="false"><i class="key-metro" aria-hidden="true"></i>地铁</button>
+          <button class="layer-toggle layer-commerce" type="button" data-layer="commerce" aria-pressed="false"><i class="key-commerce" aria-hidden="true"></i>商圈</button>
           <small>真实方向 · 示意比例 · 非导航地图</small>
         </div>
       </div>
@@ -104,6 +103,6 @@
   </dialog>
 
   <div class="load-status" id="load-status" role="status" hidden></div>
-  <script src="./assets/trip.js?v=4" defer></script>
+  <script src="./assets/trip.js?v=5" defer></script>
 </body>
 </html>

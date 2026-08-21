@@ -30,6 +30,12 @@ const commerceCenters = [
   { slug: 'mixc-city-plaza', x: 74, y: 85, side: 'right' }
 ];
 
+const mapLayers = {
+  sights: ['#map-markers'],
+  metro: ['.metro-network', '.line-legend'],
+  commerce: ['#commerce-markers']
+};
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
@@ -106,6 +112,22 @@ function showLoadError() {
   status.hidden = false;
   status.textContent = '地点资料暂时无法加载，请刷新页面重试。';
 }
+
+function setLayerVisibility(button, visible) {
+  const selectors = mapLayers[button.dataset.layer] || [];
+  selectors.forEach((selector) => {
+    const layer = document.querySelector(selector);
+    if (layer) layer.hidden = !visible;
+  });
+  button.setAttribute('aria-pressed', String(visible));
+}
+
+document.querySelectorAll('.layer-toggle[data-layer]').forEach((button) => {
+  setLayerVisibility(button, button.getAttribute('aria-pressed') === 'true');
+  button.addEventListener('click', () => {
+    setLayerVisibility(button, button.getAttribute('aria-pressed') !== 'true');
+  });
+});
 
 async function initMap() {
   const markerRoot = document.querySelector('#map-markers');

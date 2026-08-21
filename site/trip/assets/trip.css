@@ -426,45 +426,44 @@ a { color: inherit; }
   border-left: 7px solid transparent;
 }
 
-.lodging-marker {
+.xuzhou-station-marker {
   position: absolute;
   z-index: 11;
   left: 52%;
   top: 52%;
-  min-width: 48px;
-  min-height: 48px;
+  min-width: 32px;
+  min-height: 32px;
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-.lodging-dot {
-  width: 48px;
-  height: 48px;
+.xuzhou-station-dot {
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border: 5px solid #fff;
-  border-radius: 50%;
+  border: 3px solid #fff;
+  border-radius: 4px;
   background: var(--cinnabar);
-  box-shadow: 0 4px 14px rgb(127 37 29 / 28%);
+  box-shadow: 0 3px 10px rgb(127 37 29 / 22%);
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 800;
 }
 
-.lodging-label {
+.xuzhou-station-label {
   position: absolute;
-  left: 48px;
-  top: -28px;
-  min-width: 100px;
+  left: 36px;
+  top: -17px;
+  min-width: 78px;
   display: grid;
   text-align: left;
   white-space: nowrap;
 }
 
-.lodging-label strong { font-size: 14px; }
-.lodging-label small { margin-top: 3px; color: var(--cinnabar-dark); font-size: 8px; font-weight: 800; }
-.lodging-label small { display: flex; align-items: center; gap: 3px; }
-.lodging-label .line-chip { width: 13px; height: 13px; font-size: 8px; }
+.xuzhou-station-label strong { font-size: 12px; }
+.xuzhou-station-label small { margin-top: 3px; display: flex; align-items: center; gap: 3px; color: var(--cinnabar-dark); font-size: 8px; font-weight: 800; }
+.xuzhou-station-label .line-chip { width: 12px; height: 12px; font-size: 7px; }
 
 .map-key {
   position: absolute;
@@ -482,13 +481,29 @@ a { color: inherit; }
   font-weight: 700;
 }
 
-.map-key span { display: inline-flex; align-items: center; gap: 5px; }
+.layer-toggle {
+  min-height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.layer-toggle[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
 .map-key i { width: 9px; height: 9px; display: block; border-radius: 50%; }
-.key-home { background: var(--cinnabar); }
 .map-key .key-spot { width: 3px; height: 12px; border-radius: 0; background: var(--cinnabar); }
 .key-metro { background: var(--metro-2); }
 .map-key .key-commerce { border-radius: 0; background: var(--commerce); }
 .map-key small { padding-left: 12px; border-left: 1px solid var(--line); font: inherit; }
+
+.map-canvas [hidden],
+.line-legend[hidden] { display: none; }
 
 .place-dialog {
   width: min(900px, calc(100% - 28px));
@@ -537,6 +552,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
 .detail-hero h1 { max-width: 850px; margin: 0; font-family: Georgia, "Songti SC", serif; font-size: 74px; font-weight: 600; line-height: 1.04; overflow-wrap: anywhere; }
 .detail-lede { max-width: 700px; margin: 15px 0 0; font-size: 15px; font-weight: 700; line-height: 1.75; }
 .detail-caption { padding: 8px 0 0; color: var(--muted); font-size: 10px; }
+.verification-bar { margin-top: 16px; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-left: 3px solid var(--cinnabar); background: #fff; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.verification-bar strong { flex: none; color: var(--ink); }
 .detail-facts { margin: 44px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .fact { min-width: 0; padding: 19px 18px 21px 0; }
 .fact + .fact { padding-left: 18px; border-left: 1px solid var(--line); }
@@ -546,6 +563,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
 .detail-section + .detail-section { margin-top: 58px; }
 .detail-section h2 { margin: 0 0 20px; font-family: Georgia, "Songti SC", serif; font-size: 32px; font-weight: 600; }
 .detail-section > p { margin: 0 0 14px; color: #3d4a44; font-size: 14px; line-height: 1.95; }
+.section-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.section-heading-row > span { color: var(--muted); font-size: 10px; font-weight: 800; }
 .highlight-list, .route-list, .interesting-list { margin: 0; padding: 0; list-style: none; }
 .highlight-list { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ink); }
 .highlight-list li { min-width: 0; padding: 18px 15px 4px 0; border-bottom: 1px solid var(--line); }
@@ -563,6 +582,33 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
 .practical-list strong { display: block; color: var(--cinnabar-dark); font-size: 11px; font-weight: 900; }
 .practical-list p { margin: 7px 0 0; color: #3d4a44; font-size: 12px; line-height: 1.8; }
 .detail-aside { align-self: start; }
+.detail-gallery { display: grid; grid-template-columns: 1.35fr .85fr; gap: 12px; }
+.gallery-item { min-width: 0; margin: 0; background: #fff; }
+.gallery-item:first-child:nth-last-child(3) { grid-row: span 2; }
+.gallery-item img { width: 100%; height: 240px; display: block; object-fit: cover; background: #d8ded9; }
+.gallery-item:first-child:nth-last-child(3) img { height: 100%; min-height: 436px; }
+.gallery-item figcaption { padding: 12px 13px 14px; display: grid; gap: 7px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.gallery-item figcaption strong { color: var(--ink); font-size: 12px; }
+.gallery-item figcaption a { width: fit-content; text-decoration: underline; text-underline-offset: 3px; }
+.cycling-facts { margin: 0 0 24px; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.cycling-facts div { min-width: 0; padding: 14px 12px 15px 0; }
+.cycling-facts div + div { padding-left: 12px; border-left: 1px solid var(--line); }
+.cycling-facts dt { color: var(--muted); font-size: 9px; font-weight: 800; }
+.cycling-facts dd { margin: 6px 0 0; font-size: 12px; font-weight: 800; line-height: 1.5; }
+.cycling-route { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); list-style: none; counter-reset: cycling; }
+.cycling-route li { position: relative; min-width: 0; padding: 29px 10px 12px 0; border-top: 3px solid var(--lake-dark); counter-increment: cycling; }
+.cycling-route li::before { position: absolute; top: -10px; left: 0; width: 17px; height: 17px; display: grid; place-items: center; border: 2px solid var(--lake-dark); border-radius: 50%; background: var(--paper); color: var(--lake-dark); content: counter(cycling); font-size: 8px; font-weight: 900; }
+.cycling-route strong, .cycling-route span { display: block; }
+.cycling-route strong { font-size: 12px; }
+.cycling-route span { margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.cycling-note { margin-top: 18px !important; padding: 13px 15px; border: 1px solid var(--lake-dark); background: rgb(141 191 200 / 13%); font-size: 12px !important; }
+.tip-list, .source-list { margin: 0; padding: 0; list-style: none; }
+.tip-list li { padding: 11px 0 11px 17px; border-bottom: 1px solid var(--line); color: #3d4a44; font-size: 12px; line-height: 1.75; }
+.tip-list li::before { margin-left: -17px; margin-right: 8px; color: var(--cinnabar); content: "!"; font-weight: 900; }
+.source-section > p { font-size: 11px; }
+.source-list li { border-top: 1px solid var(--line); }
+.source-list a { padding: 10px 0; display: block; color: var(--cinnabar-dark); font-size: 11px; font-weight: 800; line-height: 1.6; text-decoration: none; overflow-wrap: anywhere; }
+.source-list a::after { margin-left: 5px; content: "↗"; }
 .aside-note { margin: 0 0 28px; padding: 17px; border-left: 3px solid var(--yellow); background: #fff; color: var(--muted); font-size: 12px; line-height: 1.75; }
 .aside-note strong { display: block; margin-bottom: 6px; color: var(--ink); font-size: 13px; }
 .image-credit { margin: 52px 0 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.7; }
@@ -583,8 +629,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
   .marker-label, .commerce-name { min-height: 30px; padding: 6px 7px; font-size: 10px; }
   .spot-marker { z-index: 13; }
   .commerce-marker { z-index: 12; }
-  .lodging-label { left: 42px; }
-  .lodging-dot { width: 42px; height: 42px; }
+  .xuzhou-station-label { left: 32px; }
+  .xuzhou-station-dot { width: 28px; height: 28px; }
   .place-dialog { width: calc(100% - 18px); max-height: calc(100% - 20px); margin: auto; }
   .dialog-panel { display: block; }
   .dialog-media { height: 230px; min-height: 0; }
@@ -605,6 +651,15 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
   .detail-layout { display: block; padding-top: 45px; }
   .detail-aside { margin-top: 52px; }
   .detail-section h2 { font-size: 28px; }
+  .verification-bar { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .detail-gallery { grid-template-columns: 1fr 1fr; }
+  .gallery-item:first-child:nth-last-child(3) { grid-column: 1 / -1; grid-row: auto; }
+  .gallery-item:first-child:nth-last-child(3) img { height: 320px; min-height: 0; }
+  .gallery-item img { height: 220px; }
+  .cycling-facts { grid-template-columns: 1fr 1fr; }
+  .cycling-route { grid-template-columns: 1fr; margin-left: 8px; }
+  .cycling-route li { padding: 2px 0 20px 27px; border-top: 0; border-left: 3px solid var(--lake-dark); }
+  .cycling-route li::before { top: 0; left: -10px; }
   .highlight-list { grid-template-columns: 1fr; }
   .highlight-list li, .highlight-list li + li { padding: 15px 0; border-left: 0; }
   .trip-detail .site-header { height: 60px; }
@@ -625,8 +680,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
   .line-legend { top: 70px; left: 18px; right: auto; justify-content: flex-start; }
   .map-canvas { background-size: 42px 42px; }
   .area { font-size: 19px; }
-  .lodging-marker { left: 52%; top: 53%; }
-  .lodging-label { top: 43px; left: -8px; }
+  .xuzhou-station-marker { left: 52%; top: 53%; }
+  .xuzhou-station-label { top: 31px; left: -8px; }
   .compass { top: 20px; right: 21px; }
   .water-lake { width: 20%; height: 13%; }
   .park-yunlong { width: 10%; }
@@ -639,7 +694,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
   .commerce-marker[data-place="suning-plaza"] .commerce-name { transform: translateY(-18px); }
   .commerce-marker[data-place="yunlong-wanda"] .commerce-name { transform: translateY(18px); }
   .map-key { bottom: 12px; font-size: 9px; }
-  .map-key span { gap: 3px; }
+  .layer-toggle { min-height: 28px; padding: 0 7px; gap: 3px; font-size: 9px; }
   .map-key i { width: 7px; height: 7px; }
   .map-key .key-spot { width: 3px; height: 10px; }
   .detail-main { width: calc(100% - 24px); }
@@ -647,4 +702,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outlin
   .detail-hero h1 { font-size: 39px; }
   .detail-eyebrow { font-size: 10px; }
   .detail-lede { font-size: 12px; }
+  .detail-gallery { grid-template-columns: 1fr; }
+  .gallery-item:first-child:nth-last-child(3) { grid-column: auto; }
+  .gallery-item img, .gallery-item:first-child:nth-last-child(3) img { height: 260px; }
 }
