@@ -91,6 +91,11 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function compactDateTime(value) {
+  const match = String(value ?? '').match(/^(\d{2})(\d{2})-(\d{2})-(\d{2}) (\d{2}:\d{2})$/);
+  return match ? `${match[2]}/${match[3]}/${match[4]} ${match[5]}` : '';
+}
+
 function tripDetailPage(place, index, total) {
   const typeName = place.kind === 'commerce' ? '商圈' : '景点';
   const highlights = place.highlights.map((item) => `<li><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></li>`).join('');
@@ -218,7 +223,7 @@ function detailPage(script, index) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(script.description)}">
   <title>${escapeHtml(script.name)} - Userscripts</title>
-  <link rel="stylesheet" href="../../assets/styles.css?v=26">
+  <link rel="stylesheet" href="../../assets/styles.css?v=27">
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner"><a class="wordmark" href="../../"><span class="brand-mark" aria-hidden="true">U</span><strong class="wordmark-title">Userscripts</strong></a><nav class="topnav" aria-label="Primary navigation"><a href="../../#catalog">Scripts</a><a href="https://github.com/ZhangNingYA/userscripts">Source</a></nav></div></header>
@@ -226,7 +231,7 @@ function detailPage(script, index) {
     <a class="back-link" href="../../">All scripts</a>
     <article class="detail-article">
       <header class="detail-heading">
-        <p class="eyebrow">Script ${String(index + 1).padStart(2, '0')} / v${escapeHtml(script.version)} / Updated ${escapeHtml(script.updatedAt)}</p>
+        <p class="eyebrow">Script ${String(index + 1).padStart(2, '0')} / v${escapeHtml(script.version)} / ${escapeHtml(script.updatedAtDisplay)}</p>
         <h1>${escapeHtml(script.name)}</h1>
         <p class="detail-lede">${escapeHtml(script.description)}</p>
         <div class="detail-actions">
@@ -238,7 +243,7 @@ function detailPage(script, index) {
       <div class="detail-grid">
         <section class="runs-on"><div class="section-heading"><h2>Sites</h2><p>${String(script.targets.length).padStart(2, '0')} supported</p></div><ul class="site-list">${siteRows}</ul></section>
         <section><h2>Files</h2><dl class="file-list"><div><dt>Userscript</dt><dd><a href="./${encodeURIComponent(script.filename)}${versionQuery}">${escapeHtml(script.filename)}</a></dd></div><div><dt>Text</dt><dd><a href="./${encodeURIComponent(script.textFilename)}${versionQuery}" download="${escapeHtml(script.textFilename)}">${escapeHtml(script.textFilename)}</a></dd></div></dl></section>
-        <section class="update-section"><h2>Updates</h2><p><strong>Last updated</strong><br><time>${escapeHtml(script.updatedAt)}</time></p><p>Checked automatically by your userscript manager.</p></section>
+        <section><h2>Release</h2><dl class="file-list"><div><dt>Version</dt><dd>v${escapeHtml(script.version)}</dd></div><div><dt>Date</dt><dd><time class="release-date">${escapeHtml(script.updatedAtDisplay)}</time></dd></div></dl></section>
       </div>
     </article>
   </main>
@@ -314,7 +319,7 @@ for (const folder of folders) {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(metadata.updatedAt)) {
     throw new Error(`${filename} has an invalid @lastUpdated; expected YYYY-MM-DD HH:mm`);
   }
-  const script = { slug: folder.name, filename, textFilename, ...metadata };
+  const script = { slug: folder.name, filename, textFilename, ...metadata, updatedAtDisplay: compactDateTime(metadata.updatedAt) };
   script.targets = targetsFromMatches(script.matches);
   const targetFolder = path.join(outputRoot, 'scripts', folder.name);
   await mkdir(targetFolder, { recursive: true });

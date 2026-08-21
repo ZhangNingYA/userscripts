@@ -38,7 +38,7 @@ fetch(catalogUrl, { cache: 'no-store' })
       <article class="script-entry accent-${(index % 3) + 1}">
         <span class="script-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <div class="script-summary">
-          <div class="script-meta"><span>v${escapeHtml(script.version)}</span><time>Updated ${escapeHtml(script.updatedAt)}</time>${targetLink}</div>
+          <div class="script-meta"><span>v${escapeHtml(script.version)}</span><time class="script-date">${escapeHtml(script.updatedAtDisplay)}</time>${targetLink}</div>
           <h3><a href="${detailUrl}">${escapeHtml(script.name)}</a></h3>
           <p>${escapeHtml(script.description)}</p>
         </div>

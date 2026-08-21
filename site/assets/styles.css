@@ -417,6 +417,17 @@ footer a:hover,
   color: var(--entry-accent);
 }
 
+.script-date {
+  flex: 0 0 auto;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .script-site-link {
   min-width: 0;
   overflow: hidden;
@@ -687,9 +698,10 @@ footer {
   white-space: nowrap;
 }
 
-.update-section p {
-  margin: 18px 0 0;
-  color: var(--muted);
+.release-date {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes row-in {
