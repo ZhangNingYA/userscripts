@@ -3,17 +3,19 @@
 // @name:zh-CN   Google News 导航
 // @name:en      Google News Navigator
 // @namespace    https://scripts.fulafu.com/
-// @version      1.2.1
-// @lastUpdated  2026-08-19 20:10
-// @description  One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
-// @description:zh-CN 统一支持 Google News、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
-// @description:en One English reading companion for Google News, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
+// @version      1.3.0
+// @lastUpdated  2026-08-21 20:00
+// @description  One English reading companion for Google News, Tend Reading, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
+// @description:zh-CN 统一支持 Google News、Tend Reading、Reuters 和十大英文新闻网站，提供缓存译文、重点词组与精简句子主干标记。
+// @description:en One English reading companion for Google News, Tend Reading, Reuters, and ten major publishers, with cached translations, key phrases, and core grammar highlighting.
 // @author       ZhangNingYA
 // @homepageURL  https://scripts.fulafu.com/scripts/google-news-english-reader/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
 // @updateURL    https://scripts.fulafu.com/scripts/google-news-english-reader/google-news-english-reader.user.js
 // @downloadURL  https://scripts.fulafu.com/scripts/google-news-english-reader/google-news-english-reader.user.js
 // @match        https://news.google.com/*
+// @match        https://www.fulafu.com/blog/*
+// @exclude      https://www.fulafu.com/blog/
 // @match        https://www.reuters.com/*
 // @match        https://reuters.com/*
 // @match        https://apnews.com/*
@@ -43,8 +45,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.2.1';
-    const SCRIPT_RELEASED_AT = '2026-08-19 20:10:34 UTC+8';
+    const SCRIPT_VERSION = '1.3.0';
+    const SCRIPT_RELEASED_AT = '2026-08-21 20:00:36 UTC+8';
     const CONFIG_KEY = 'google-news-english-reader-config-v1';
     const LEGACY_CONFIG_KEY = 'google-news-english-reader-config-legacy';
     const ANALYSIS_CACHE_KEY = 'google-news-english-reader-analysis-v1';
@@ -72,6 +74,13 @@
         targetLanguage: 'Simplified Chinese'
     };
     const SITE_ADAPTERS = [
+        {
+            id: 'fulafu',
+            name: 'Tend Reading',
+            hosts: ['fulafu.com'],
+            pathPattern: /^\/blog\/[^/]+\/?$/,
+            rootSelectors: ['article.reading-article', '.reading-post-grid article', 'main article']
+        },
         {
             id: 'reuters',
             name: 'Reuters',
@@ -1460,7 +1469,7 @@
             acceptNode(node) {
                 const parent = node.parentElement;
                 if (!node.data || !parent) return NodeFilter.FILTER_REJECT;
-                if (parent.closest('.rer-inline-control, .rer-detail-panel, script, style, noscript')) {
+                if (parent.closest('.rer-inline-control, .rer-detail-panel, script, style, noscript, [aria-hidden="true"]')) {
                     return NodeFilter.FILTER_REJECT;
                 }
                 return NodeFilter.FILTER_ACCEPT;
@@ -1536,6 +1545,10 @@
         return SITE_ADAPTERS.find((adapter) => adapter.hosts.some((host) => (
             hostname === host || hostname.endsWith(`.${host}`)
         ))) || null;
+    }
+
+    function isTendSentence(element) {
+        return getSiteAdapter()?.id === 'fulafu' && Boolean(element.closest('.sentence-original'));
     }
 
     function findBestArticleRoot(selectors) {
@@ -1647,8 +1660,9 @@
         if (!(element instanceof HTMLElement) || element.closest(REJECTED_CONTENT_SELECTOR)) return false;
         if (element.querySelector('time, button, input, textarea, select')) return false;
         const text = normalizeReadingText(element.textContent);
-        if (text.length < 45 || !/[A-Za-z]/.test(text)) return false;
-        if ((text.match(/[A-Za-z]+/g) || []).length < 7) return false;
+        const tendSentence = isTendSentence(element);
+        if (text.length < (tendSentence ? 2 : 45) || !/[A-Za-z]/.test(text)) return false;
+        if (!tendSentence && (text.match(/[A-Za-z]+/g) || []).length < 7) return false;
         if (/^(copyright|all rights reserved|click here|read more|sign up|subscribe|reporting by|editing by|this material may not)\b/i.test(text)) {
             return false;
         }
@@ -1675,7 +1689,7 @@
 
     function shouldProcessReadingElement(text, element, kind) {
         const isHeadline = kind === 'headline';
-        const minimumLength = isHeadline ? 12 : 45;
+        const minimumLength = isHeadline ? 12 : isTendSentence(element) ? 2 : 45;
         if (!text || text.length < minimumLength || !/[A-Za-z]/.test(text)) return false;
         if (isGoogleNewsPage()) {
             if (element.closest('.rer-toolbar, .rer-settings, header, nav, footer, aside, form, button')) return false;
