@@ -2,7 +2,7 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.6.0
+// @version      2.6.1
 // @description  將 PTT 轉換為最新優先的瀑布流 SPA 閱讀器，支援向下無限載入、頁面狀態還原與閱讀設定
 // @description:en Transform PTT into a modern latest-first waterfall reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
@@ -19,8 +19,8 @@
 (function () {
   'use strict';
 
-  const SCRIPT_VERSION = '2.6.0';
-  const SCRIPT_RELEASED_AT = '2026-08-17 15:35:48 UTC+8';
+  const SCRIPT_VERSION = '2.6.1';
+  const SCRIPT_RELEASED_AT = '2026-08-21 09:02:26 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -213,8 +213,8 @@
     .pttr-error-action:focus-visible, .pttr-error-retry:focus-visible { outline:2px solid var(--r-accent); outline-offset:3px; }
     .pttr-toast { position:fixed; left:50%; bottom:22px; z-index:80; transform:translate(-50%,16px); opacity:0; pointer-events:none; padding:9px 14px; border-radius:6px; color:var(--r-surface); background:var(--r-text); box-shadow:var(--r-shadow); font-size:12px; transition:opacity .2s ease,transform .2s ease; } .pttr-toast.show { opacity:1; transform:translate(-50%,0); }
     @media (max-width:1180px) { .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { grid-template-columns:minmax(0,1fr); } .pttr-rail { display:none; } .pttr-view { max-width:960px; } }
-    @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { padding:0 12px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px 56px; } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px 70px; } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
-    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px 50px; } .pttr-story-list, .pttr-story-column { gap:10px; } .pttr-story-list { padding-top:12px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
+    @media (max-width:820px) { .pttr-header { height:58px; } .pttr-brand { padding:0 12px; border-right:0; } .pttr-brand-copy span { display:none; } .pttr-header-location { padding:0 8px; } .pttr-header-location span { display:none; } .pttr-header-location strong { max-width:150px; } .pttr-header-actions { padding:0 8px; } .pttr-layout, #ptt-reader-app.board-mode .pttr-layout { display:block; height:calc(100vh - 58px); } .pttr-main { height:100%; } .pttr-view, #ptt-reader-app.board-mode .pttr-view { padding:28px 18px calc(88px + env(safe-area-inset-bottom, 0px)); } .pttr-view-head { align-items:stretch; flex-direction:column; gap:20px; } .pttr-search { width:100%; flex-basis:auto; } .pttr-article-view { padding:24px 20px calc(104px + env(safe-area-inset-bottom, 0px)); } .pttr-article-header { padding:28px 0 24px; } .pttr-article-header h1 { font-size:28px; } .pttr-settings { top:54px; right:8px; width:min(300px,calc(100vw - 16px)); } }
+    @media (max-width:560px) { .pttr-brand-copy { display:none; } .pttr-header-location strong { max-width:115px; } #ptt-reader-app.board-mode .pttr-view { padding:22px 12px calc(96px + env(safe-area-inset-bottom, 0px)); } .pttr-story-list, .pttr-story-column { gap:10px; } .pttr-story-list { padding-top:12px; } .pttr-story-cover { min-height:var(--card-mobile-height); gap:12px; padding:12px; } .pttr-story h2 { font-size:14px; line-height:1.5; } .pttr-story-footer { min-height:46px; padding:8px 9px; } .pttr-card-avatar { width:22px; height:22px; flex-basis:22px; font-size:9px; } .pttr-story-author { gap:5px; } .pttr-story-author strong { max-width:55px; font-size:10px; } .pttr-story-engagement > span:first-child { display:none; } .pttr-story-score { font-size:10px; } .pttr-list-toolbar { min-height:42px; } .pttr-push { grid-template-columns:27px 82px minmax(0,1fr); gap:7px; } .pttr-push-time { display:none; } .pttr-comments-head { align-items:flex-start; flex-direction:column; gap:8px; } .pttr-comment-summary { flex-wrap:wrap; } .pttr-prose { line-height:1.9; } }
     @media (prefers-reduced-motion:reduce) { #ptt-reader-app *, #ptt-reader-app *::before, #ptt-reader-app *::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
   `;
 
