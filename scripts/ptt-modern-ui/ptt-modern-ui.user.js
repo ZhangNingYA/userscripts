@@ -2,8 +2,8 @@
 // @name         PTT 現代化介面
 // @name:en      PTT Modern Reader
 // @namespace    https://www.ptt.cc/
-// @version      2.6.2
-// @lastUpdated  2026-08-21 19:38
+// @version      2.6.3
+// @lastUpdated  2026-08-29 11:12
 // @description  將 PTT 轉換為最新優先的瀑布流 SPA 閱讀器，支援向下無限載入、頁面狀態還原與閱讀設定
 // @description:en Transform PTT into a modern latest-first waterfall reader with infinite scrolling, navigation state restoration, and reading preferences
 // @author       Codex
@@ -20,8 +20,8 @@
 (function () {
   'use strict';
 
-  const SCRIPT_VERSION = '2.6.2';
-  const SCRIPT_RELEASED_AT = '2026-08-21 19:38:41 UTC+8';
+  const SCRIPT_VERSION = '2.6.3';
+  const SCRIPT_RELEASED_AT = '2026-08-29 11:12:00 UTC+8';
 
   if (!/(^|\.)ptt\.cc$/i.test(location.hostname)) return;
 
@@ -442,7 +442,7 @@
     }
 
     const main = doc.querySelector('#main-content');
-    if (main && main.querySelector('.article-metaline, .article-metaline-right')) {
+    if (main && main.querySelector('.article-metaline, .article-metaline-right, .push')) {
       const metadata = {};
       main.querySelectorAll('.article-metaline, .article-metaline-right').forEach((line) => {
         const key = clean(line.querySelector('.article-meta-tag')?.textContent);
@@ -455,11 +455,18 @@
         const tag = clean(push.querySelector('.push-tag')?.textContent);
         const rawTime = clean(push.querySelector('.push-ipdatetime')?.textContent);
         const time = rawTime.match(/\d{2}\/\d{2}\s+\d{2}:\d{2}$/)?.[0] || rawTime;
+        const contentNode = push.querySelector('.push-content');
+        const rawContent = contentNode
+          ? contentNode.textContent
+          : Array.from(push.childNodes)
+            .filter((node) => node.nodeType === 3 || !node.matches?.('.push-tag, .push-userid, .push-ipdatetime'))
+            .map((node) => node.textContent)
+            .join(' ');
         return {
           tag,
           kind: tag.includes('噓') ? 'down' : tag.includes('推') ? 'up' : 'neutral',
           user: clean(push.querySelector('.push-userid')?.textContent) || '—',
-          content: clean(push.querySelector('.push-content')?.textContent).replace(/^:\s*/, ''),
+          content: normalizePushContent(rawContent),
           time
         };
       });
@@ -1122,6 +1129,13 @@
 
   function clean(value) {
     return String(value ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizePushContent(value) {
+    const content = clean(value);
+    // A colon is PTT's delimiter, but a colon-only push is still a real
+    // comment and should not be rendered as an empty row.
+    return content.replace(/^:\s*(?=\S)/, '');
   }
 
   function initial(value) {
