@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.2.1
-// @lastUpdated  2026-08-30 22:10
+// @version      1.3.0
+// @lastUpdated  2026-08-30 22:48
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -27,8 +27,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.2.1';
-    const SCRIPT_RELEASED_AT = '2026-08-30 22:10:56 UTC+8';
+    const SCRIPT_VERSION = '1.3.0';
+    const SCRIPT_RELEASED_AT = '2026-08-30 22:48:23 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -37,7 +37,7 @@
     const STORAGE_KEY = 'fulafu-study-ai-config-v1';
     const DEFAULT_CONFIG = Object.freeze({
         endpoint: 'https://api.openai.com/v1/responses',
-        model: 'gpt-5.6-luna',
+        model: 'gpt-5.6',
         apiKey: ''
     });
     const MAX_CONTEXT_LENGTH = 12000;
@@ -112,29 +112,22 @@
             inset: 0;
             z-index: 2147483646;
             display: block;
-            color: #24312b;
+            color: #26332d;
             font: 14px/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
             letter-spacing: 0;
             pointer-events: none;
         }
 
-        #${ROOT_ID}[hidden] {
+        #${ROOT_ID}[hidden],
+        #${ROOT_ID} [hidden] {
             display: none !important;
         }
 
         #${ROOT_ID} .fulafu-study-ai-backdrop {
             position: absolute;
             inset: 0;
-            background: rgba(20, 27, 24, .32);
-            opacity: 1;
-            pointer-events: auto;
-            backdrop-filter: blur(2px);
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-backdrop[hidden],
-        #${PANEL_ID}[hidden],
-        #${ROOT_ID} .fulafu-study-ai-mini[hidden] {
-            display: none !important;
+            background: transparent;
+            pointer-events: none;
         }
 
         #${ROOT_ID} .fulafu-study-ai-mini {
@@ -148,32 +141,36 @@
             min-height: 48px;
             place-items: center;
             padding: 0;
-            color: #315848;
-            background: #f8faf8;
-            border: 1px solid rgba(29, 51, 41, .18);
+            color: #fff;
+            background: #2f6b51;
+            border: 1px solid rgba(255, 255, 255, .45);
             border-radius: 50%;
-            box-shadow: 0 8px 28px rgba(19, 35, 28, .2);
+            box-shadow: 0 10px 30px rgba(20, 45, 34, .26);
             font-size: 19px;
             line-height: 1;
             pointer-events: auto;
         }
 
         #${ROOT_ID} .fulafu-study-ai-mini:hover {
-            background: #edf3ef;
+            background: #285d47;
         }
 
         #${PANEL_ID} {
             position: absolute;
-            inset: 0 0 0 auto;
+            right: max(16px, env(safe-area-inset-right));
+            bottom: max(16px, env(safe-area-inset-bottom));
             display: flex;
-            width: min(440px, calc(100vw - 28px));
+            width: min(420px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+            max-height: calc(100dvh - 32px);
             min-width: 0;
             flex-direction: column;
             overflow: hidden;
-            color: #24312b;
-            background: #f8faf8;
-            border-left: 1px solid rgba(29, 51, 41, .15);
-            box-shadow: -20px 0 60px rgba(19, 35, 28, .2);
+            color: #26332d;
+            background: #fbfcfb;
+            border: 1px solid rgba(38, 64, 52, .14);
+            border-radius: 18px;
+            box-shadow: 0 20px 70px rgba(17, 38, 29, .24);
             pointer-events: auto;
         }
 
@@ -186,7 +183,7 @@
         }
 
         #${ROOT_ID} button {
-            min-height: 40px;
+            min-height: 38px;
             border: 0;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
@@ -194,176 +191,159 @@
 
         #${ROOT_ID} .fulafu-study-ai-header {
             display: flex;
-            min-height: 66px;
+            min-height: 58px;
             flex: 0 0 auto;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px 10px 18px;
-            background: rgba(248, 250, 248, .95);
-            border-bottom: 1px solid rgba(29, 51, 41, .12);
+            gap: 9px;
+            padding: 9px 10px 9px 14px;
+            background: rgba(251, 252, 251, .96);
+            border-bottom: 1px solid rgba(38, 64, 52, .1);
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-brand-mark {
+            display: grid;
+            width: 30px;
+            height: 30px;
+            flex: 0 0 30px;
+            place-items: center;
+            color: #2f6b51;
+            background: #e9f2ed;
+            border-radius: 9px;
+            font-size: 15px;
+            line-height: 1;
         }
 
         #${ROOT_ID} .fulafu-study-ai-heading {
             min-width: 0;
             flex: 1;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-heading strong,
-        #${ROOT_ID} .fulafu-study-ai-heading span {
-            display: block;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-heading strong {
             font-size: 15px;
             line-height: 1.25;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-heading span {
-            margin-top: 3px;
-            overflow: hidden;
-            color: #6b786f;
-            font-size: 11px;
-            line-height: 1.25;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        #${ROOT_ID} .fulafu-study-ai-header-actions {
+            display: flex;
+            gap: 2px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-icon-button {
             display: inline-grid;
-            width: 40px;
-            flex: 0 0 40px;
+            width: 38px;
+            min-width: 38px;
+            height: 38px;
             place-items: center;
             padding: 0;
-            color: #526259;
+            color: #627068;
             background: transparent;
             border-radius: 10px;
-            font-size: 20px;
+            font-size: 18px;
+            line-height: 1;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-icon-button:hover {
-            color: #1e3f31;
-            background: #e9efeb;
+        #${ROOT_ID} .fulafu-study-ai-icon-button:hover,
+        #${ROOT_ID} .fulafu-study-ai-icon-button[data-active="true"] {
+            color: #245b43;
+            background: #eaf1ed;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-body,
+        #${ROOT_ID} .fulafu-study-ai-chat-view {
+            display: flex;
+            min-height: 0;
+            flex-direction: column;
         }
 
         #${ROOT_ID} .fulafu-study-ai-body {
-            display: flex;
-            min-height: 0;
-            flex: 1;
-            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-settings {
+            max-height: min(620px, calc(100vh - 92px));
+            max-height: min(620px, calc(100dvh - 92px));
+            padding: 18px;
             overflow-y: auto;
             overscroll-behavior: contain;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-settings {
-            flex: 0 0 auto;
-            padding: 15px 18px 17px;
-            background: #f1f5f2;
-            border-bottom: 1px solid rgba(29, 51, 41, .12);
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-settings[hidden] {
-            display: none;
-        }
-
         #${ROOT_ID} .fulafu-study-ai-settings-title {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-settings-title strong {
-            font-size: 14px;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-settings-title span {
-            color: #718078;
-            font-size: 11px;
+            margin-bottom: 14px;
+            font-size: 15px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-field {
             display: block;
-            margin-top: 10px;
-            color: #536159;
+            margin-top: 12px;
+            color: #526159;
             font-size: 12px;
             font-weight: 700;
         }
 
         #${ROOT_ID} .fulafu-study-ai-field input,
-        #${ROOT_ID} .fulafu-study-ai-field textarea,
         #${ROOT_ID} .fulafu-study-ai-context,
         #${ROOT_ID} .fulafu-study-ai-question {
             display: block;
             width: 100%;
-            margin-top: 5px;
-            padding: 10px 11px;
-            color: #24312b;
+            color: #26332d;
             background: #fff;
             border: 1px solid rgba(41, 69, 56, .2);
-            border-radius: 10px;
             outline: 0;
-            resize: vertical;
         }
 
         #${ROOT_ID} .fulafu-study-ai-field input {
-            min-height: 42px;
+            min-height: 44px;
+            margin-top: 6px;
+            padding: 10px 12px;
+            border-radius: 11px;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-settings-help {
-            margin: 10px 0 0;
-            color: #6a776f;
-            font-size: 11px;
-            line-height: 1.55;
+        #${ROOT_ID} .fulafu-study-ai-advanced {
+            margin-top: 14px;
+            padding-top: 2px;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-settings-actions,
-        #${ROOT_ID} .fulafu-study-ai-compose-actions {
+        #${ROOT_ID} .fulafu-study-ai-advanced summary {
+            color: #526159;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-settings-actions {
             display: flex;
             align-items: center;
             gap: 9px;
-            margin-top: 12px;
+            margin-top: 18px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-primary,
         #${ROOT_ID} .fulafu-study-ai-secondary {
             min-height: 42px;
-            padding: 8px 14px;
-            border-radius: 10px;
+            padding: 8px 15px;
+            border-radius: 11px;
             font-weight: 700;
         }
 
         #${ROOT_ID} .fulafu-study-ai-primary {
             color: #fff;
-            background: #2e6c51;
+            background: #2f6b51;
         }
 
         #${ROOT_ID} .fulafu-study-ai-primary:hover {
-            background: #245a43;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-primary[data-busy="true"] {
-            background: #8a5a4a;
+            background: #275d46;
         }
 
         #${ROOT_ID} .fulafu-study-ai-secondary {
-            color: #3f5148;
-            background: #e4ebe6;
+            color: #45564d;
+            background: #e9efeb;
         }
 
         #${ROOT_ID} .fulafu-study-ai-status {
-            min-height: 18px;
-            margin: 9px 0 0;
-            color: #69756e;
+            margin: 8px 0 0;
+            color: #68766e;
             font-size: 12px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-status[data-kind="error"] {
-            color: #9f362f;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-status[data-kind="success"] {
-            color: #26724e;
+            color: #a23d35;
         }
 
         #${ROOT_ID} .fulafu-study-ai-status:empty {
@@ -372,11 +352,15 @@
 
         #${ROOT_ID} .fulafu-study-ai-conversation {
             display: flex;
+            max-height: min(48vh, 440px);
+            max-height: min(48dvh, 440px);
             min-height: 0;
-            flex: 1 1 auto;
             flex-direction: column;
-            gap: 12px;
-            padding: 16px 18px;
+            gap: 14px;
+            padding: 16px 16px 4px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
         }
 
         #${ROOT_ID} .fulafu-study-ai-conversation:empty {
@@ -384,77 +368,141 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-message {
-            max-width: 92%;
-            padding: 10px 12px;
-            border-radius: 12px;
+            max-width: 90%;
             overflow-wrap: anywhere;
             white-space: pre-wrap;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="user"] {
             align-self: flex-end;
-            color: #fff;
-            background: #346d55;
-            border-bottom-right-radius: 4px;
+            padding: 9px 12px;
+            color: #26372f;
+            background: #e5f0e9;
+            border-radius: 14px 14px 4px 14px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] {
-            align-self: flex-start;
-            color: #25332c;
-            background: #e8eee9;
-            border-bottom-left-radius: 4px;
+            align-self: stretch;
+            max-width: 100%;
+            padding: 2px 3px;
+            color: #26332d;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"]:empty::after {
+            content: "•••";
+            color: #809087;
+            letter-spacing: 3px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-composer {
-            position: sticky;
-            bottom: 0;
             flex: 0 0 auto;
-            padding: 14px 18px max(16px, env(safe-area-inset-bottom));
-            background: rgba(248, 250, 248, .97);
-            border-top: 1px solid rgba(29, 51, 41, .12);
+            padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-context-card {
+            margin-bottom: 10px;
+            padding: 9px 10px;
+            background: #f0f4f1;
+            border: 1px solid rgba(41, 69, 56, .1);
+            border-radius: 11px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-context-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-label {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            color: #56645c;
+            flex: 0 0 auto;
+            color: #2e6a50;
             font-size: 11px;
             font-weight: 700;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-context-label span:last-child {
+        #${ROOT_ID} .fulafu-study-ai-context-preview {
+            min-width: 0;
+            flex: 1;
             overflow: hidden;
-            color: #819087;
-            font-weight: 500;
+            color: #66736c;
+            font-size: 11px;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
+        #${ROOT_ID} .fulafu-study-ai-context-toggle {
+            min-height: 28px;
+            flex: 0 0 auto;
+            padding: 2px 5px;
+            color: #526159;
+            background: transparent;
+            border-radius: 7px;
+            font-size: 11px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-context-toggle:hover {
+            background: #e2eae5;
+        }
+
         #${ROOT_ID} .fulafu-study-ai-context {
-            height: 76px;
-            min-height: 58px;
-            margin-top: 6px;
-            color: #445249;
-            background: #f0f4f1;
+            min-height: 74px;
+            max-height: 160px;
+            margin-top: 8px;
+            padding: 9px 10px;
+            border-radius: 9px;
             font-size: 12px;
             line-height: 1.5;
+            resize: vertical;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-question-shell {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            padding: 7px 7px 7px 12px;
+            background: #fff;
+            border: 1px solid rgba(41, 69, 56, .22);
+            border-radius: 15px;
+            box-shadow: 0 4px 16px rgba(27, 53, 41, .06);
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-question-shell:focus-within {
+            border-color: rgba(39, 105, 76, .55);
+            box-shadow: 0 0 0 3px rgba(39, 105, 76, .1);
         }
 
         #${ROOT_ID} .fulafu-study-ai-question {
-            min-height: 64px;
-            max-height: 180px;
-            margin-top: 10px;
-            line-height: 1.5;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-compose-actions {
-            justify-content: flex-end;
+            min-height: 34px;
+            max-height: 144px;
+            padding: 6px 0;
+            background: transparent;
+            border: 0;
+            line-height: 1.55;
+            resize: none;
         }
 
         #${ROOT_ID} .fulafu-study-ai-send {
-            min-width: 92px;
+            display: grid;
+            width: 38px;
+            min-width: 38px;
+            height: 38px;
+            min-height: 38px;
+            place-items: center;
+            padding: 0;
+            color: #fff;
+            background: #2f6b51;
+            border-radius: 11px;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-send:hover {
+            background: #275d46;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-send[data-busy="true"] {
+            background: #9a5b49;
+            font-size: 14px;
         }
 
         @media (max-width: 640px) {
@@ -466,17 +514,24 @@
             }
 
             #${PANEL_ID} {
+                right: 0;
+                bottom: 0;
                 width: 100vw;
-                border-left: 0;
-                box-shadow: none;
+                max-height: calc(100vh - max(12px, env(safe-area-inset-top)));
+                max-height: calc(100dvh - max(12px, env(safe-area-inset-top)));
+                border-width: 1px 0 0;
+                border-radius: 20px 20px 0 0;
+                box-shadow: 0 -12px 50px rgba(17, 38, 29, .2);
             }
 
             #${ROOT_ID} .fulafu-study-ai-backdrop {
-                display: none;
+                background: rgba(19, 27, 23, .16);
+                pointer-events: auto;
             }
 
             #${ROOT_ID} .fulafu-study-ai-header {
-                padding-top: max(10px, env(safe-area-inset-top));
+                min-height: 60px;
+                padding-inline: 14px 8px;
             }
 
             #${ROOT_ID} button {
@@ -484,14 +539,37 @@
             }
 
             #${ROOT_ID} .fulafu-study-ai-icon-button {
-                width: 44px;
-                flex-basis: 44px;
+                width: 42px;
+                min-width: 42px;
+                height: 44px;
             }
 
-            #${ROOT_ID} .fulafu-study-ai-settings,
-            #${ROOT_ID} .fulafu-study-ai-conversation,
-            #${ROOT_ID} .fulafu-study-ai-composer {
+            #${ROOT_ID} .fulafu-study-ai-settings {
+                max-height: calc(100vh - 74px - env(safe-area-inset-top));
+                max-height: calc(100dvh - 74px - env(safe-area-inset-top));
+                padding: 16px;
+            }
+
+            #${ROOT_ID} .fulafu-study-ai-conversation {
+                max-height: min(50vh, 460px);
+                max-height: min(50dvh, 460px);
                 padding-inline: 14px;
+            }
+
+            #${ROOT_ID} .fulafu-study-ai-composer {
+                padding-inline: 12px;
+            }
+
+            #${ROOT_ID} .fulafu-study-ai-context-toggle {
+                min-height: 32px;
+                padding-inline: 7px;
+            }
+
+            #${ROOT_ID} .fulafu-study-ai-send {
+                width: 42px;
+                min-width: 42px;
+                height: 42px;
+                min-height: 42px;
             }
         }
 
@@ -525,9 +603,10 @@
     function loadConfig() {
         const stored = safeGetValue(STORAGE_KEY, null);
         if (!stored || typeof stored !== 'object') return { ...DEFAULT_CONFIG };
+        const storedModel = typeof stored.model === 'string' ? stored.model.trim() : '';
         return {
             endpoint: typeof stored.endpoint === 'string' && stored.endpoint.trim() ? stored.endpoint.trim() : DEFAULT_CONFIG.endpoint,
-            model: typeof stored.model === 'string' && stored.model.trim() ? stored.model.trim() : DEFAULT_CONFIG.model,
+            model: storedModel && storedModel !== 'gpt-5.6-luna' ? storedModel : DEFAULT_CONFIG.model,
             apiKey: typeof stored.apiKey === 'string' ? stored.apiKey.trim() : ''
         };
     }
@@ -613,49 +692,61 @@
         if (elements) return elements;
         const root = document.createElement('div');
         root.id = ROOT_ID;
+        root.dataset.version = SCRIPT_VERSION;
+        root.dataset.releasedAt = SCRIPT_RELEASED_AT;
         root.hidden = true;
         root.innerHTML = `
             <div class="fulafu-study-ai-backdrop" data-action="close" aria-hidden="true"></div>
             <button class="fulafu-study-ai-mini" type="button" data-action="restore" aria-label="展开学习 AI 助手" title="展开学习 AI 助手" hidden>✦</button>
             <aside id="${PANEL_ID}" role="dialog" aria-modal="true" aria-labelledby="fulafu-study-ai-title">
                 <header class="fulafu-study-ai-header">
-                    <div class="fulafu-study-ai-heading">
-                        <strong id="fulafu-study-ai-title">学习 AI 助手</strong>
-                        <span>v${SCRIPT_VERSION} · ${SCRIPT_RELEASED_AT}</span>
+                    <span class="fulafu-study-ai-brand-mark" aria-hidden="true">✦</span>
+                    <strong class="fulafu-study-ai-heading" id="fulafu-study-ai-title">问 AI</strong>
+                    <div class="fulafu-study-ai-header-actions">
+                        <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="连接设置" title="连接设置">⚙</button>
+                        <button class="fulafu-study-ai-icon-button" type="button" data-action="minimize" aria-label="缩小 AI 助手" title="缩小">−</button>
+                        <button class="fulafu-study-ai-icon-button" type="button" data-action="close" aria-label="关闭 AI 助手" title="关闭">×</button>
                     </div>
-                    <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="打开 API 设置" title="API 设置">⚙</button>
-                    <button class="fulafu-study-ai-icon-button" type="button" data-action="minimize" aria-label="缩小 AI 助手" title="缩小">−</button>
-                    <button class="fulafu-study-ai-icon-button" type="button" data-action="close" aria-label="关闭 AI 助手" title="关闭">×</button>
                 </header>
                 <div class="fulafu-study-ai-body">
-                    <section class="fulafu-study-ai-settings" aria-label="API 设置" hidden>
-                        <div class="fulafu-study-ai-settings-title"><strong>API 设置</strong><span>仅保存在此 userscript 的本地存储</span></div>
+                    <section class="fulafu-study-ai-settings" aria-label="连接设置" hidden>
+                        <div class="fulafu-study-ai-settings-title"><strong>连接设置</strong></div>
                         <label class="fulafu-study-ai-field">API Key
                             <input type="password" name="apiKey" autocomplete="off" spellcheck="false" placeholder="粘贴你的 Key">
-                        </label>
-                        <label class="fulafu-study-ai-field">API URL
-                            <input type="url" name="endpoint" inputmode="url" autocomplete="off" spellcheck="false">
                         </label>
                         <label class="fulafu-study-ai-field">模型
                             <input type="text" name="model" autocomplete="off" spellcheck="false">
                         </label>
-                        <p class="fulafu-study-ai-settings-help">支持 OpenAI Responses API（URL 以 /responses 结尾）和常见的 Chat Completions 兼容接口。个人浏览器脚本无法像服务端密钥库一样保护 Key，请使用单独项目、用量上限和可撤销的 Key。</p>
+                        <details class="fulafu-study-ai-advanced" data-advanced>
+                            <summary>高级设置</summary>
+                            <label class="fulafu-study-ai-field">接口地址
+                                <input type="url" name="endpoint" inputmode="url" autocomplete="off" spellcheck="false">
+                            </label>
+                        </details>
                         <div class="fulafu-study-ai-settings-actions">
-                            <button class="fulafu-study-ai-primary" type="button" data-action="save-settings">保存设置</button>
-                            <button class="fulafu-study-ai-secondary" type="button" data-action="hide-settings">收起</button>
+                            <button class="fulafu-study-ai-primary" type="button" data-action="save-settings">保存</button>
+                            <button class="fulafu-study-ai-secondary" type="button" data-action="hide-settings">取消</button>
                         </div>
                         <p class="fulafu-study-ai-status" data-settings-status aria-live="polite"></p>
                     </section>
-                    <div class="fulafu-study-ai-conversation" data-conversation aria-live="polite"></div>
-                    <section class="fulafu-study-ai-composer" aria-label="提问区">
-                        <label class="fulafu-study-ai-context-label" for="fulafu-study-ai-context"><span>当前段落</span><span>可以编辑后再发送</span></label>
-                        <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前段落内容"></textarea>
-                        <textarea class="fulafu-study-ai-question" data-question aria-label="你的问题" placeholder="这段话是什么意思？"></textarea>
-                        <div class="fulafu-study-ai-compose-actions">
-                            <button class="fulafu-study-ai-primary fulafu-study-ai-send" type="button" data-action="send">提问</button>
-                        </div>
-                        <p class="fulafu-study-ai-status" data-request-status aria-live="polite"></p>
-                    </section>
+                    <div class="fulafu-study-ai-chat-view" data-chat-view>
+                        <div class="fulafu-study-ai-conversation" data-conversation aria-live="polite"></div>
+                        <section class="fulafu-study-ai-composer" aria-label="提问区">
+                            <div class="fulafu-study-ai-context-card">
+                                <div class="fulafu-study-ai-context-head">
+                                    <span class="fulafu-study-ai-context-label">引用段落</span>
+                                    <span class="fulafu-study-ai-context-preview" data-context-preview></span>
+                                    <button class="fulafu-study-ai-context-toggle" type="button" data-action="toggle-context">编辑</button>
+                                </div>
+                                <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前段落内容" hidden></textarea>
+                            </div>
+                            <div class="fulafu-study-ai-question-shell">
+                                <textarea class="fulafu-study-ai-question" data-question rows="1" aria-label="你的问题" placeholder="针对这段内容提问…"></textarea>
+                                <button class="fulafu-study-ai-send" type="button" data-action="send" aria-label="发送问题" title="发送">↑</button>
+                            </div>
+                            <p class="fulafu-study-ai-status" data-request-status aria-live="polite"></p>
+                        </section>
+                    </div>
                 </div>
             </aside>`;
         document.body.append(root);
@@ -665,21 +756,33 @@
             panel: root.querySelector(`#${PANEL_ID}`),
             backdrop: root.querySelector('.fulafu-study-ai-backdrop'),
             mini: root.querySelector('.fulafu-study-ai-mini'),
+            title: root.querySelector('#fulafu-study-ai-title'),
+            settingsButton: root.querySelector('[data-action="settings"]'),
             settings: root.querySelector('.fulafu-study-ai-settings'),
+            advanced: root.querySelector('[data-advanced]'),
+            chatView: root.querySelector('[data-chat-view]'),
             apiKey: root.querySelector('[name="apiKey"]'),
             endpoint: root.querySelector('[name="endpoint"]'),
             model: root.querySelector('[name="model"]'),
             settingsStatus: root.querySelector('[data-settings-status]'),
             conversation: root.querySelector('[data-conversation]'),
             context: root.querySelector('[data-context]'),
+            contextPreview: root.querySelector('[data-context-preview]'),
+            contextToggle: root.querySelector('[data-action="toggle-context"]'),
             question: root.querySelector('[data-question]'),
             send: root.querySelector('[data-action="send"]'),
             requestStatus: root.querySelector('[data-request-status]')
         };
 
         root.addEventListener('click', handlePanelClick);
+        elements.context.addEventListener('input', updateContextPreview);
+        elements.question.addEventListener('input', resizeQuestionInput);
         elements.question.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            const keyboardSend = event.key === 'Enter'
+                && !event.shiftKey
+                && !event.isComposing
+                && (!window.matchMedia('(pointer: coarse)').matches || event.ctrlKey || event.metaKey);
+            if (keyboardSend) {
                 event.preventDefault();
                 if (activeRequest) abortActiveRequest();
                 else void askAI();
@@ -696,9 +799,13 @@
         if (action === 'close') closePanel();
         if (action === 'minimize') minimizePanel();
         if (action === 'restore') restorePanel();
-        if (action === 'settings') showSettings();
+        if (action === 'settings') {
+            if (elements.settings.hidden) showSettings();
+            else hideSettings();
+        }
         if (action === 'hide-settings') hideSettings();
         if (action === 'save-settings') saveSettings();
+        if (action === 'toggle-context') toggleContextEditor();
         if (action === 'send') {
             if (activeRequest) abortActiveRequest();
             else void askAI();
@@ -710,6 +817,7 @@
         elements.apiKey.value = config.apiKey;
         elements.endpoint.value = config.endpoint;
         elements.model.value = config.model;
+        elements.advanced.open = config.endpoint !== DEFAULT_CONFIG.endpoint;
     }
 
     function validateEndpoint(value) {
@@ -745,8 +853,8 @@
         try {
             config = readSettingsForm();
             const persisted = safeSetValue(STORAGE_KEY, config);
-            setStatus(elements.settingsStatus, persisted ? '已保存在 userscript 本地存储中。' : '当前会话已应用；本地存储不可用，刷新后需要重新填写。', persisted ? 'success' : 'error');
-            if (persisted) window.setTimeout(hideSettings, 650);
+            setStatus(elements.settingsStatus, persisted ? '已保存。' : '已应用，刷新后需重新设置。', persisted ? 'success' : 'error');
+            if (persisted) window.setTimeout(hideSettings, 350);
         } catch (error) {
             setStatus(elements.settingsStatus, error.message || '设置无效。', 'error');
         }
@@ -755,19 +863,47 @@
     function showSettings({ focus = true } = {}) {
         fillSettings();
         elements.settings.hidden = false;
+        elements.chatView.hidden = true;
+        elements.settingsButton.dataset.active = 'true';
+        elements.title.textContent = '连接设置';
         setStatus(elements.settingsStatus);
-        if (focus) window.setTimeout(() => (config.apiKey ? elements.endpoint : elements.apiKey).focus(), 0);
+        if (focus) window.setTimeout(() => (config.apiKey ? elements.model : elements.apiKey).focus(), 0);
     }
 
-    function hideSettings() {
+    function hideSettings({ focus = true } = {}) {
         if (!elements) return;
         elements.settings.hidden = true;
-        focusVisiblePanelControl();
+        elements.chatView.hidden = false;
+        elements.settingsButton.dataset.active = 'false';
+        elements.title.textContent = '问 AI';
+        if (focus) focusVisiblePanelControl();
     }
 
     function focusVisiblePanelControl() {
         if (!elements || elements.root.hidden) return;
-        (elements.panel.hidden ? elements.mini : elements.question).focus();
+        if (elements.panel.hidden) elements.mini.focus();
+        else if (!elements.settings.hidden) (config.apiKey ? elements.model : elements.apiKey).focus();
+        else elements.question.focus();
+    }
+
+    function updateContextPreview() {
+        if (!elements) return;
+        elements.contextPreview.textContent = normalizeSpace(elements.context.value) || '未选择内容';
+    }
+
+    function toggleContextEditor() {
+        const willShow = elements.context.hidden;
+        elements.context.hidden = !willShow;
+        elements.contextToggle.textContent = willShow ? '完成' : '编辑';
+        updateContextPreview();
+        if (willShow) window.setTimeout(() => elements.context.focus(), 0);
+        else elements.question.focus();
+    }
+
+    function resizeQuestionInput() {
+        if (!elements) return;
+        elements.question.style.height = 'auto';
+        elements.question.style.height = `${Math.min(elements.question.scrollHeight, 144)}px`;
     }
 
     function showPanelChrome() {
@@ -788,7 +924,7 @@
     function restorePanel() {
         if (!elements) return;
         showPanelChrome();
-        window.setTimeout(() => elements.question.focus(), 0);
+        window.setTimeout(focusVisiblePanelControl, 0);
     }
 
     function openPanel(context = '', { focusSettings = false } = {}) {
@@ -800,16 +936,21 @@
             currentContext = nextContext;
             contextRevision += 1;
             elements.context.value = currentContext;
+            elements.context.hidden = true;
+            elements.contextToggle.textContent = '编辑';
+            updateContextPreview();
             elements.question.value = '';
+            resizeQuestionInput();
             setStatus(elements.requestStatus);
         } else if (!elements.context.value && currentContext) {
             elements.context.value = currentContext;
+            updateContextPreview();
         }
         showPanelChrome();
         document.documentElement.style.setProperty('--fulafu-study-ai-panel-open', '1');
         if (focusSettings || !config.apiKey) showSettings();
         else {
-            elements.settings.hidden = true;
+            hideSettings({ focus: false });
             window.setTimeout(() => elements.question.focus(), 0);
         }
     }
@@ -827,7 +968,7 @@
         message.dataset.role = role;
         message.textContent = text;
         elements.conversation.append(message);
-        message.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        elements.conversation.scrollTop = elements.conversation.scrollHeight;
         return message;
     }
 
@@ -874,7 +1015,8 @@
                 instructions: buildInstructions(),
                 input: sessionHistory,
                 max_output_tokens: 1600,
-                store: false
+                store: false,
+                stream: true
             };
         }
         return {
@@ -884,7 +1026,7 @@
                 ...sessionHistory
             ],
             max_tokens: 1600,
-            stream: false
+            stream: true
         };
     }
 
@@ -916,17 +1058,76 @@
         return `API 请求失败（HTTP ${status || '未知'}）。${detail ? ` ${detail}` : ''}`;
     }
 
-    function requestAI(payload) {
+    function streamTextDelta(data) {
+        if (data?.type === 'response.output_text.delta' && typeof data.delta === 'string') return data.delta;
+        const content = data?.choices?.[0]?.delta?.content;
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+            return content.map((part) => typeof part === 'string' ? part : part?.text || '').join('');
+        }
+        return '';
+    }
+
+    function streamError(data) {
+        if (data?.type === 'error') return data?.error?.message || data?.message || 'API 流式响应失败。';
+        if (data?.type === 'response.failed') return data?.response?.error?.message || 'API 未能生成回答。';
+        return '';
+    }
+
+    function requestAI(payload, onUpdate) {
         return new Promise((resolve, reject) => {
             if (typeof GM_xmlhttpRequest !== 'function') {
                 reject(new Error('当前 userscript 管理器不支持跨域请求。'));
                 return;
             }
             let settled = false;
+            let streamedText = '';
+            let progressText = '';
+            let eventBuffer = '';
+            let eventError = '';
+            let completedResponse = null;
             const finish = (callback, value) => {
                 if (settled) return;
                 settled = true;
                 callback(value);
+            };
+            const consumeEvent = (block) => {
+                const rawData = block
+                    .split(/\r?\n/)
+                    .filter((line) => line.startsWith('data:'))
+                    .map((line) => line.slice(5).trimStart())
+                    .join('\n')
+                    .trim();
+                if (!rawData || rawData === '[DONE]') return;
+                let data;
+                try {
+                    data = JSON.parse(rawData);
+                } catch {
+                    return;
+                }
+                const errorMessage = streamError(data);
+                if (errorMessage) {
+                    eventError = errorMessage;
+                    return;
+                }
+                const delta = streamTextDelta(data);
+                if (delta) {
+                    streamedText += delta;
+                    if (typeof onUpdate === 'function') onUpdate(streamedText);
+                }
+                if (data?.type === 'response.completed' && data.response) completedResponse = data.response;
+            };
+            const consumeProgress = (responseText, flush = false) => {
+                if (typeof responseText !== 'string') return;
+                let nextText = '';
+                if (responseText.startsWith(progressText)) nextText = responseText.slice(progressText.length);
+                else if (responseText !== progressText) nextText = responseText;
+                progressText = responseText;
+                eventBuffer += nextText;
+                const blocks = eventBuffer.split(/\r?\n\r?\n/);
+                eventBuffer = flush ? '' : blocks.pop() || '';
+                if (flush && eventBuffer) blocks.push(eventBuffer);
+                blocks.forEach(consumeEvent);
             };
             try {
                 const handle = GM_xmlhttpRequest({
@@ -934,11 +1135,20 @@
                     url: config.endpoint,
                     headers: {
                         'Content-Type': 'application/json',
+                        Accept: 'text/event-stream, application/json',
                         Authorization: `Bearer ${config.apiKey}`
                     },
                     data: JSON.stringify(payload),
+                    responseType: 'text',
                     timeout: REQUEST_TIMEOUT_MS,
                     anonymous: true,
+                    onprogress(response) {
+                        try {
+                            consumeProgress(response.responseText || '');
+                        } catch {
+                            // Some userscript managers expose responseText only after completion.
+                        }
+                    },
                     onload(response) {
                         let data = null;
                         try {
@@ -951,6 +1161,16 @@
                             return;
                         }
                         try {
+                            consumeProgress(response.responseText || '', true);
+                            if (eventError) throw new Error(eventError);
+                            if (streamedText.trim()) {
+                                finish(resolve, streamedText.trim());
+                                return;
+                            }
+                            if (completedResponse) {
+                                finish(resolve, parseApiResponse(completedResponse));
+                                return;
+                            }
                             finish(resolve, parseApiResponse(data));
                         } catch (error) {
                             finish(reject, error);
@@ -987,7 +1207,9 @@
 
     function setBusy(isBusy) {
         elements.send.dataset.busy = isBusy ? 'true' : 'false';
-        elements.send.textContent = isBusy ? '停止' : '提问';
+        elements.send.textContent = isBusy ? '■' : '↑';
+        elements.send.setAttribute('aria-label', isBusy ? '停止回答' : '发送问题');
+        elements.send.title = isBusy ? '停止' : '发送';
         elements.question.readOnly = isBusy;
         elements.context.readOnly = isBusy;
     }
@@ -1022,25 +1244,33 @@
         const userEntry = { role: 'user', content: question, context };
         history.push(userEntry);
         const userMessage = appendMessage('user', question);
+        const assistantMessage = appendMessage('assistant', '');
         elements.question.value = '';
+        resizeQuestionInput();
         setBusy(true);
-        setStatus(elements.requestStatus, 'AI 正在阅读这一段…');
+        setStatus(elements.requestStatus, '正在回答…');
 
         let requestForTurn = null;
         try {
-            const requestPromise = requestAI(responsePayload());
+            const requestPromise = requestAI(responsePayload(), (partialAnswer) => {
+                if (revision !== contextRevision) return;
+                assistantMessage.textContent = partialAnswer;
+                elements.conversation.scrollTop = elements.conversation.scrollHeight;
+            });
             requestForTurn = activeRequest;
             const answer = await requestPromise;
             if (revision !== contextRevision) return;
+            assistantMessage.textContent = answer;
             history.push({ role: 'assistant', content: answer });
-            appendMessage('assistant', answer);
-            setStatus(elements.requestStatus, '回答完成。', 'success');
+            setStatus(elements.requestStatus);
         } catch (error) {
             const entryIndex = history.indexOf(userEntry);
             if (entryIndex !== -1) history.splice(entryIndex, 1);
             userMessage.remove();
+            assistantMessage.remove();
             if (revision !== contextRevision) return;
             elements.question.value = question;
+            resizeQuestionInput();
             if (error?.name === 'AbortError') {
                 setStatus(elements.requestStatus, '请求已停止。');
             } else {
