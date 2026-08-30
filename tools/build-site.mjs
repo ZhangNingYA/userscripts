@@ -11,7 +11,7 @@ const sitePresentation = new Map([
   ['chatgpt.com', { label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
   ['chat.openai.com', { key: 'chatgpt.com', label: 'ChatGPT', url: 'https://chatgpt.com/', display: 'chatgpt.com/*' }],
   ['news.google.com', { label: 'Google News', url: 'https://news.google.com/home?hl=en-US&gl=US&ceid=US:en', display: 'news.google.com/*' }],
-  ['fulafu.com', { label: 'Tend Reading', url: 'https://www.fulafu.com/blog/', display: 'fulafu.com/blog/*' }],
+  ['fulafu.com', { label: 'Fulafu Study', url: 'https://www.fulafu.com/study/', display: 'fulafu.com/study/*' }],
   ['reuters.com', { label: 'Reuters', url: 'https://www.reuters.com/' }],
   ['apnews.com', { label: 'AP News', url: 'https://apnews.com/' }],
   ['bbc.com', { label: 'BBC News', url: 'https://www.bbc.com/news' }],
