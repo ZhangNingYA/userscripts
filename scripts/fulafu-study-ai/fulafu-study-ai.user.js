@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.1.0
-// @lastUpdated  2026-08-30 17:13
+// @version      1.2.0
+// @lastUpdated  2026-08-30 21:58
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -27,8 +27,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.1.0';
-    const SCRIPT_RELEASED_AT = '2026-08-30 17:13:11 UTC+8';
+    const SCRIPT_VERSION = '1.2.0';
+    const SCRIPT_RELEASED_AT = '2026-08-30 21:58:46 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -57,12 +57,12 @@
         .${BUTTON_CLASS} {
             box-sizing: border-box !important;
             display: inline-grid !important;
-            width: 1.45em !important;
-            height: 1.45em !important;
+            width: 1.7em !important;
+            height: 1.7em !important;
             min-width: 0 !important;
             min-height: 0 !important;
             place-items: center !important;
-            margin: 0 0 0 .12em !important;
+            margin: 0 0 0 .16em !important;
             padding: 0 !important;
             color: inherit !important;
             background: transparent !important;
@@ -70,10 +70,10 @@
             border-radius: .25em !important;
             box-shadow: none !important;
             font: inherit !important;
-            font-size: .82em !important;
+            font-size: 1.08em !important;
             line-height: 1 !important;
             letter-spacing: 0 !important;
-            opacity: .48 !important;
+            opacity: .76 !important;
             text-decoration: none !important;
             vertical-align: .06em !important;
             cursor: pointer !important;
@@ -85,7 +85,7 @@
         .${BUTTON_CLASS}:hover {
             color: inherit !important;
             background: transparent !important;
-            opacity: .92 !important;
+            opacity: 1 !important;
         }
 
         .${BUTTON_CLASS}:active {
@@ -366,35 +366,21 @@
             color: #26724e;
         }
 
+        #${ROOT_ID} .fulafu-study-ai-status:empty {
+            display: none;
+        }
+
         #${ROOT_ID} .fulafu-study-ai-conversation {
             display: flex;
-            min-height: 120px;
-            flex: 1 0 auto;
+            min-height: 0;
+            flex: 1 1 auto;
             flex-direction: column;
             gap: 12px;
             padding: 16px 18px;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-empty {
-            margin: auto 0;
-            padding: 24px 14px;
-            color: #758079;
-            text-align: center;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-empty strong,
-        #${ROOT_ID} .fulafu-study-ai-empty span {
-            display: block;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-empty strong {
-            color: #45554c;
-            font-size: 14px;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-empty span {
-            margin-top: 4px;
-            font-size: 12px;
+        #${ROOT_ID} .fulafu-study-ai-conversation:empty {
+            display: none;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message {
@@ -447,8 +433,8 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-context {
-            height: 86px;
-            min-height: 64px;
+            height: 76px;
+            min-height: 58px;
             margin-top: 6px;
             color: #445249;
             background: #f0f4f1;
@@ -457,19 +443,14 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-question {
-            min-height: 74px;
+            min-height: 64px;
             max-height: 180px;
             margin-top: 10px;
             line-height: 1.5;
         }
 
         #${ROOT_ID} .fulafu-study-ai-compose-actions {
-            justify-content: space-between;
-        }
-
-        #${ROOT_ID} .fulafu-study-ai-shortcut {
-            color: #7a867f;
-            font-size: 11px;
+            justify-content: flex-end;
         }
 
         #${ROOT_ID} .fulafu-study-ai-send {
@@ -481,7 +462,7 @@
                 width: 40px !important;
                 height: 40px !important;
                 margin: -10px -5px -10px .08em !important;
-                font-size: .82em !important;
+                font-size: 1.08em !important;
             }
 
             #${PANEL_ID} {
@@ -665,15 +646,12 @@
                         </div>
                         <p class="fulafu-study-ai-status" data-settings-status aria-live="polite"></p>
                     </section>
-                    <div class="fulafu-study-ai-conversation" data-conversation aria-live="polite">
-                        <div class="fulafu-study-ai-empty" data-empty><strong>这段内容已经就绪</strong><span>本次访问的问答会保留到刷新页面为止。</span></div>
-                    </div>
+                    <div class="fulafu-study-ai-conversation" data-conversation aria-live="polite"></div>
                     <section class="fulafu-study-ai-composer" aria-label="提问区">
                         <label class="fulafu-study-ai-context-label" for="fulafu-study-ai-context"><span>当前段落</span><span>可以编辑后再发送</span></label>
                         <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前段落内容"></textarea>
                         <textarea class="fulafu-study-ai-question" data-question aria-label="你的问题" placeholder="这段话是什么意思？"></textarea>
                         <div class="fulafu-study-ai-compose-actions">
-                            <span class="fulafu-study-ai-shortcut">Ctrl / ⌘ + Enter 发送</span>
                             <button class="fulafu-study-ai-primary fulafu-study-ai-send" type="button" data-action="send">提问</button>
                         </div>
                         <p class="fulafu-study-ai-status" data-request-status aria-live="polite"></p>
@@ -693,7 +671,6 @@
             model: root.querySelector('[name="model"]'),
             settingsStatus: root.querySelector('[data-settings-status]'),
             conversation: root.querySelector('[data-conversation]'),
-            empty: root.querySelector('[data-empty]'),
             context: root.querySelector('[data-context]'),
             question: root.querySelector('[data-question]'),
             send: root.querySelector('[data-action="send"]'),
@@ -845,7 +822,6 @@
     }
 
     function appendMessage(role, text) {
-        elements.empty.hidden = true;
         const message = document.createElement('div');
         message.className = 'fulafu-study-ai-message';
         message.dataset.role = role;
