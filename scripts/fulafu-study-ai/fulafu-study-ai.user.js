@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.2.0
-// @lastUpdated  2026-08-30 21:58
+// @version      1.2.1
+// @lastUpdated  2026-08-30 22:10
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -27,8 +27,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.2.0';
-    const SCRIPT_RELEASED_AT = '2026-08-30 21:58:46 UTC+8';
+    const SCRIPT_VERSION = '1.2.1';
+    const SCRIPT_RELEASED_AT = '2026-08-30 22:10:56 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -57,12 +57,12 @@
         .${BUTTON_CLASS} {
             box-sizing: border-box !important;
             display: inline-grid !important;
-            width: 1.7em !important;
-            height: 1.7em !important;
+            width: 1.18em !important;
+            height: 1.5em !important;
             min-width: 0 !important;
             min-height: 0 !important;
             place-items: center !important;
-            margin: 0 0 0 .16em !important;
+            margin: 0 0 0 .02em !important;
             padding: 0 !important;
             color: inherit !important;
             background: transparent !important;
@@ -70,10 +70,10 @@
             border-radius: .25em !important;
             box-shadow: none !important;
             font: inherit !important;
-            font-size: 1.08em !important;
+            font-size: .94em !important;
             line-height: 1 !important;
             letter-spacing: 0 !important;
-            opacity: .76 !important;
+            opacity: .7 !important;
             text-decoration: none !important;
             vertical-align: .06em !important;
             cursor: pointer !important;
@@ -461,8 +461,8 @@
             .${BUTTON_CLASS} {
                 width: 40px !important;
                 height: 40px !important;
-                margin: -10px -5px -10px .08em !important;
-                font-size: 1.08em !important;
+                margin: -10px -8px -10px -.36em !important;
+                font-size: .94em !important;
             }
 
             #${PANEL_ID} {

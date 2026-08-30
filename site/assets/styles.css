@@ -506,41 +506,39 @@ footer a:hover,
 
 .primary-button {
   --install-accent: var(--coral);
-  min-height: 42px;
-  gap: 8px;
-  padding: 0 17px;
+  min-height: 40px;
+  gap: 7px;
+  padding: 0 15px;
   color: #fff;
-  background: color-mix(in srgb, var(--install-accent) 68%, var(--ink));
-  border: 1px solid color-mix(in srgb, var(--install-accent) 68%, var(--ink));
-  border-radius: 5px;
-  box-shadow: 0 3px 0 var(--install-accent);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: none;
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease;
 }
 
 .script-entry .primary-button {
   --install-accent: var(--entry-accent);
 }
 
-.primary-button::after {
-  content: "↓";
-  font-size: 14px;
-  line-height: 1;
-  transition: transform .2s ease;
+.primary-button::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  background: var(--install-accent);
+  border-radius: 50%;
 }
 
 .primary-button:hover {
-  color: #fff;
-  background: var(--ink);
-  border-color: var(--ink);
-  box-shadow: 0 4px 0 var(--install-accent);
-  transform: translateY(-2px);
-}
-
-.primary-button:hover::after {
-  transform: translateY(2px);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--install-accent) 12%, var(--paper));
+  border-color: var(--install-accent);
+  transform: none;
 }
 
 .primary-button:active {
-  box-shadow: 0 1px 0 var(--install-accent);
+  background: color-mix(in srgb, var(--install-accent) 20%, var(--paper));
   transform: translateY(1px);
 }
 
