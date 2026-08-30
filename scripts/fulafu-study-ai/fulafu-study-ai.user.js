@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.0.0
-// @lastUpdated  2026-08-30 16:06
+// @version      1.1.0
+// @lastUpdated  2026-08-30 17:13
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -27,8 +27,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.0.0';
-    const SCRIPT_RELEASED_AT = '2026-08-30 16:06:44 UTC+8';
+    const SCRIPT_VERSION = '1.1.0';
+    const SCRIPT_RELEASED_AT = '2026-08-30 17:13:11 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -41,7 +41,6 @@
         apiKey: ''
     });
     const MAX_CONTEXT_LENGTH = 12000;
-    const MAX_HISTORY_MESSAGES = 12;
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
 
@@ -57,37 +56,40 @@
     const css = String.raw`
         .${BUTTON_CLASS} {
             box-sizing: border-box !important;
-            display: inline-flex !important;
-            min-width: 34px !important;
-            min-height: 34px !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 5px !important;
-            margin: .25em 0 .1em .55em !important;
-            padding: 4px 9px !important;
-            color: #315848 !important;
-            background: color-mix(in srgb, #e4f0e9 82%, transparent) !important;
-            border: 1px solid rgba(49, 88, 72, .24) !important;
-            border-radius: 999px !important;
+            display: inline-grid !important;
+            width: 1.45em !important;
+            height: 1.45em !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            place-items: center !important;
+            margin: 0 0 0 .12em !important;
+            padding: 0 !important;
+            color: inherit !important;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: .25em !important;
             box-shadow: none !important;
-            font: 600 12px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif !important;
+            font: inherit !important;
+            font-size: .82em !important;
+            line-height: 1 !important;
             letter-spacing: 0 !important;
+            opacity: .48 !important;
             text-decoration: none !important;
-            vertical-align: .08em !important;
+            vertical-align: .06em !important;
             cursor: pointer !important;
             appearance: none !important;
             -webkit-tap-highlight-color: transparent !important;
-            transition: color 140ms ease, background 140ms ease, border-color 140ms ease, transform 140ms ease !important;
+            transition: opacity 140ms ease, transform 140ms ease !important;
         }
 
         .${BUTTON_CLASS}:hover {
-            color: #173d2e !important;
-            background: #dcece3 !important;
-            border-color: rgba(23, 61, 46, .38) !important;
+            color: inherit !important;
+            background: transparent !important;
+            opacity: .92 !important;
         }
 
         .${BUTTON_CLASS}:active {
-            transform: scale(.97) !important;
+            transform: scale(.9) !important;
         }
 
         .${BUTTON_CLASS}:focus-visible,
@@ -127,6 +129,37 @@
             opacity: 1;
             pointer-events: auto;
             backdrop-filter: blur(2px);
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-backdrop[hidden],
+        #${PANEL_ID}[hidden],
+        #${ROOT_ID} .fulafu-study-ai-mini[hidden] {
+            display: none !important;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-mini {
+            position: absolute;
+            right: max(16px, env(safe-area-inset-right));
+            bottom: max(16px, env(safe-area-inset-bottom));
+            display: grid;
+            width: 48px;
+            min-width: 48px;
+            height: 48px;
+            min-height: 48px;
+            place-items: center;
+            padding: 0;
+            color: #315848;
+            background: #f8faf8;
+            border: 1px solid rgba(29, 51, 41, .18);
+            border-radius: 50%;
+            box-shadow: 0 8px 28px rgba(19, 35, 28, .2);
+            font-size: 19px;
+            line-height: 1;
+            pointer-events: auto;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-mini:hover {
+            background: #edf3ef;
         }
 
         #${PANEL_ID} {
@@ -445,10 +478,10 @@
 
         @media (max-width: 640px) {
             .${BUTTON_CLASS} {
-                min-width: 44px !important;
-                min-height: 44px !important;
-                padding-inline: 11px !important;
-                font-size: 13px !important;
+                width: 40px !important;
+                height: 40px !important;
+                margin: -10px -5px -10px .08em !important;
+                font-size: .82em !important;
             }
 
             #${PANEL_ID} {
@@ -567,7 +600,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = BUTTON_CLASS;
-        button.textContent = '✦ 问 AI';
+        button.textContent = '✦';
         button.title = '围绕这一段提问';
         button.setAttribute('aria-label', '围绕这一段内容向 AI 提问');
         button.addEventListener('click', (event) => {
@@ -602,6 +635,7 @@
         root.hidden = true;
         root.innerHTML = `
             <div class="fulafu-study-ai-backdrop" data-action="close" aria-hidden="true"></div>
+            <button class="fulafu-study-ai-mini" type="button" data-action="restore" aria-label="展开学习 AI 助手" title="展开学习 AI 助手" hidden>✦</button>
             <aside id="${PANEL_ID}" role="dialog" aria-modal="true" aria-labelledby="fulafu-study-ai-title">
                 <header class="fulafu-study-ai-header">
                     <div class="fulafu-study-ai-heading">
@@ -609,6 +643,7 @@
                         <span>v${SCRIPT_VERSION} · ${SCRIPT_RELEASED_AT}</span>
                     </div>
                     <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="打开 API 设置" title="API 设置">⚙</button>
+                    <button class="fulafu-study-ai-icon-button" type="button" data-action="minimize" aria-label="缩小 AI 助手" title="缩小">−</button>
                     <button class="fulafu-study-ai-icon-button" type="button" data-action="close" aria-label="关闭 AI 助手" title="关闭">×</button>
                 </header>
                 <div class="fulafu-study-ai-body">
@@ -631,7 +666,7 @@
                         <p class="fulafu-study-ai-status" data-settings-status aria-live="polite"></p>
                     </section>
                     <div class="fulafu-study-ai-conversation" data-conversation aria-live="polite">
-                        <div class="fulafu-study-ai-empty" data-empty><strong>这段内容已经就绪</strong><span>在下方输入问题即可开始。</span></div>
+                        <div class="fulafu-study-ai-empty" data-empty><strong>这段内容已经就绪</strong><span>本次访问的问答会保留到刷新页面为止。</span></div>
                     </div>
                     <section class="fulafu-study-ai-composer" aria-label="提问区">
                         <label class="fulafu-study-ai-context-label" for="fulafu-study-ai-context"><span>当前段落</span><span>可以编辑后再发送</span></label>
@@ -650,6 +685,8 @@
         elements = {
             root,
             panel: root.querySelector(`#${PANEL_ID}`),
+            backdrop: root.querySelector('.fulafu-study-ai-backdrop'),
+            mini: root.querySelector('.fulafu-study-ai-mini'),
             settings: root.querySelector('.fulafu-study-ai-settings'),
             apiKey: root.querySelector('[name="apiKey"]'),
             endpoint: root.querySelector('[name="endpoint"]'),
@@ -680,6 +717,8 @@
         const action = button?.dataset.action || backdrop?.dataset.action;
         if (!action) return;
         if (action === 'close') closePanel();
+        if (action === 'minimize') minimizePanel();
+        if (action === 'restore') restorePanel();
         if (action === 'settings') showSettings();
         if (action === 'hide-settings') hideSettings();
         if (action === 'save-settings') saveSettings();
@@ -746,16 +785,33 @@
     function hideSettings() {
         if (!elements) return;
         elements.settings.hidden = true;
-        elements.question.focus();
+        focusVisiblePanelControl();
     }
 
-    function resetConversation() {
-        history = [];
-        contextRevision += 1;
+    function focusVisiblePanelControl() {
+        if (!elements || elements.root.hidden) return;
+        (elements.panel.hidden ? elements.mini : elements.question).focus();
+    }
+
+    function showPanelChrome() {
+        elements.root.hidden = false;
+        elements.backdrop.hidden = false;
+        elements.panel.hidden = false;
+        elements.mini.hidden = true;
+    }
+
+    function minimizePanel() {
+        if (!elements || elements.root.hidden || elements.panel.hidden) return;
+        elements.backdrop.hidden = true;
+        elements.panel.hidden = true;
+        elements.mini.hidden = false;
+        elements.mini.focus();
+    }
+
+    function restorePanel() {
         if (!elements) return;
-        elements.conversation.querySelectorAll('.fulafu-study-ai-message').forEach((message) => message.remove());
-        elements.empty.hidden = false;
-        setStatus(elements.requestStatus);
+        showPanelChrome();
+        window.setTimeout(() => elements.question.focus(), 0);
     }
 
     function openPanel(context = '', { focusSettings = false } = {}) {
@@ -765,13 +821,14 @@
         if (nextContext && nextContext !== currentContext) {
             abortActiveRequest();
             currentContext = nextContext;
+            contextRevision += 1;
             elements.context.value = currentContext;
             elements.question.value = '';
-            resetConversation();
+            setStatus(elements.requestStatus);
         } else if (!elements.context.value && currentContext) {
             elements.context.value = currentContext;
         }
-        elements.root.hidden = false;
+        showPanelChrome();
         document.documentElement.style.setProperty('--fulafu-study-ai-panel-open', '1');
         if (focusSettings || !config.apiKey) showSettings();
         else {
@@ -803,19 +860,26 @@
         if (!value) throw new Error('当前段落为空，请先填写要讨论的内容。');
         if (value !== currentContext) {
             currentContext = value;
-            resetConversation();
+            contextRevision += 1;
         }
         return value;
     }
 
-    function buildInstructions(context) {
+    function buildInstructions() {
         return [
             '你是一个耐心、准确的中文学习助手。优先使用简体中文回答，除非用户明确要求其他语言。',
-            '请围绕用户正在阅读的原文回答；公式使用清楚的纯文本或 LaTeX 表示。不要假装原文包含它没有提供的信息。',
-            `页面标题：${document.title}`,
-            '用户正在阅读的原文：',
-            context
+            '每一轮用户消息都包含当时正在阅读的引用段落。请结合本次访问中此前的问答和该轮引用回答。',
+            '公式使用清楚的纯文本或 LaTeX 表示。不要假装引用段落包含它没有提供的信息。',
+            `页面标题：${document.title}`
         ].join('\n');
+    }
+
+    function apiHistoryItem(item) {
+        if (item.role !== 'user' || !item.context) return { role: item.role, content: item.content };
+        return {
+            role: 'user',
+            content: `【本轮引用段落】\n${item.context}\n\n【问题】\n${item.content}`
+        };
     }
 
     function isResponsesEndpoint(endpoint) {
@@ -826,13 +890,13 @@
         }
     }
 
-    function responsePayload(context) {
-        const recentHistory = history.slice(-MAX_HISTORY_MESSAGES);
+    function responsePayload() {
+        const sessionHistory = history.map(apiHistoryItem);
         if (isResponsesEndpoint(config.endpoint)) {
             return {
                 model: config.model,
-                instructions: buildInstructions(context),
-                input: recentHistory.map((item) => ({ role: item.role, content: item.content })),
+                instructions: buildInstructions(),
+                input: sessionHistory,
                 max_output_tokens: 1600,
                 store: false
             };
@@ -840,8 +904,8 @@
         return {
             model: config.model,
             messages: [
-                { role: 'system', content: buildInstructions(context) },
-                ...recentHistory.map((item) => ({ role: item.role, content: item.content }))
+                { role: 'system', content: buildInstructions() },
+                ...sessionHistory
             ],
             max_tokens: 1600,
             stream: false
@@ -979,7 +1043,7 @@
         }
 
         const revision = contextRevision;
-        const userEntry = { role: 'user', content: question };
+        const userEntry = { role: 'user', content: question, context };
         history.push(userEntry);
         const userMessage = appendMessage('user', question);
         elements.question.value = '';
@@ -988,7 +1052,7 @@
 
         let requestForTurn = null;
         try {
-            const requestPromise = requestAI(responsePayload(context));
+            const requestPromise = requestAI(responsePayload());
             requestForTurn = activeRequest;
             const answer = await requestPromise;
             if (revision !== contextRevision) return;
@@ -1010,7 +1074,7 @@
             if (activeRequest === requestForTurn) {
                 activeRequest = null;
                 setBusy(false);
-                elements.question.focus();
+                focusVisiblePanelControl();
             }
         }
     }
