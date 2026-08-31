@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.1
-// @lastUpdated  2026-08-31 11:18
+// @version      1.4.2
+// @lastUpdated  2026-08-31 11:30
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,12 +30,14 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.1';
-    const SCRIPT_RELEASED_AT = '2026-08-31 11:18:44 UTC+8';
+    const SCRIPT_VERSION = '1.4.2';
+    const SCRIPT_RELEASED_AT = '2026-08-31 11:30:04 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
     const BUTTON_CLASS = 'fulafu-study-ai-ask';
+    const FORMULA_BUTTON_CLASS = 'fulafu-study-ai-ask-formula';
+    const FORMULA_WRAPPER_CLASS = 'fulafu-study-ai-formula-with-ask';
     const DECORATED_ATTRIBUTE = 'data-fulafu-study-ai-ready';
     const STORAGE_KEY = 'fulafu-study-ai-config-v1';
     const KATEX_RESOURCE_NAME = 'FULAFU_STUDY_AI_KATEX_CSS';
@@ -50,6 +52,7 @@
     const MAX_CONTEXT_LENGTH = 12000;
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
+    const AI_ICON_SVG = `<svg class="fulafu-study-ai-face-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.75c-6.05 0-10.5 3.8-10.5 8.95 0 2.72 1.27 5.11 3.55 6.68l-.85 3.9a.75.75 0 0 0 1.06.83l4.06-2.08c.87.21 1.77.32 2.68.32 6.05 0 10.5-3.8 10.5-8.95S18.05 1.75 12 1.75Z"/><circle cx="8.7" cy="10.35" r="1.1" fill="var(--fulafu-study-ai-face-color, #fff)"/><circle cx="15.3" cy="10.35" r="1.1" fill="var(--fulafu-study-ai-face-color, #fff)"/><path d="M8.75 13.55c.82.88 1.9 1.32 3.25 1.32s2.43-.44 3.25-1.32" fill="none" stroke="var(--fulafu-study-ai-face-color, #fff)" stroke-linecap="round" stroke-width="1.5"/></svg>`;
 
     let config = loadConfig();
     let elements = null;
@@ -65,12 +68,12 @@
         .${BUTTON_CLASS} {
             box-sizing: border-box !important;
             display: inline-grid !important;
-            width: 1.18em !important;
-            height: 1.5em !important;
+            width: 1.16em !important;
+            height: 1.42em !important;
             min-width: 0 !important;
             min-height: 0 !important;
             place-items: center !important;
-            margin: 0 0 0 .02em !important;
+            margin: 0 0 0 -.03em !important;
             padding: 0 !important;
             color: inherit !important;
             background: transparent !important;
@@ -78,7 +81,7 @@
             border-radius: .25em !important;
             box-shadow: none !important;
             font: inherit !important;
-            font-size: .94em !important;
+            font-size: 1em !important;
             line-height: 1 !important;
             letter-spacing: 0 !important;
             opacity: .7 !important;
@@ -88,6 +91,37 @@
             appearance: none !important;
             -webkit-tap-highlight-color: transparent !important;
             transition: opacity 140ms ease, transform 140ms ease !important;
+        }
+
+        .${BUTTON_CLASS} .fulafu-study-ai-face-icon {
+            display: block !important;
+            width: 1.1em !important;
+            height: 1.1em !important;
+            overflow: visible !important;
+            pointer-events: none !important;
+        }
+
+        .${BUTTON_CLASS}.${FORMULA_BUTTON_CLASS} {
+            margin-left: .08em !important;
+            vertical-align: .02em !important;
+        }
+
+        .katex-display[${DECORATED_ATTRIBUTE}] {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            text-align: center !important;
+        }
+
+        .katex-display > .${FORMULA_WRAPPER_CLASS} {
+            display: inline-flex !important;
+            width: auto !important;
+            align-items: center !important;
+            vertical-align: middle !important;
+        }
+
+        .katex-display > .${FORMULA_WRAPPER_CLASS} > .katex-html {
+            display: inline-block !important;
+            width: auto !important;
         }
 
         .${BUTTON_CLASS}:hover {
@@ -158,6 +192,12 @@
             font-size: 19px;
             line-height: 1;
             pointer-events: auto;
+            --fulafu-study-ai-face-color: #2f6b51;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-mini .fulafu-study-ai-face-icon {
+            width: 27px;
+            height: 27px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-mini:hover {
@@ -238,6 +278,12 @@
             border-radius: 9px;
             font-size: 15px;
             line-height: 1;
+            --fulafu-study-ai-face-color: #e9f2ed;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-brand-mark .fulafu-study-ai-face-icon {
+            width: 21px;
+            height: 21px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-heading {
@@ -473,7 +519,7 @@
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] pre,
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] table,
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] .fulafu-study-ai-math-block {
-            margin: .72em 0;
+            margin: .48em 0;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h1,
@@ -482,7 +528,7 @@
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h4,
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h5,
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h6 {
-            margin: 1em 0 .5em;
+            margin: .78em 0 .32em;
             color: #20372c;
             font-weight: 750;
             line-height: 1.35;
@@ -509,7 +555,7 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] li + li {
-            margin-top: .35em;
+            margin-top: .2em;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] blockquote {
@@ -553,14 +599,14 @@
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] hr {
             height: 1px;
-            margin: 1em 0;
+            margin: .75em 0;
             background: rgba(41, 69, 56, .16);
             border: 0;
         }
 
         #${ROOT_ID} .fulafu-study-ai-table-wrap {
             max-width: 100%;
-            margin: .72em 0;
+            margin: .48em 0;
             overflow-x: auto;
             border: 1px solid rgba(41, 69, 56, .15);
             border-radius: 9px;
@@ -737,8 +783,12 @@
             .${BUTTON_CLASS} {
                 width: 40px !important;
                 height: 40px !important;
-                margin: -10px -8px -10px -.36em !important;
+                margin: -10px -10px -10px -11px !important;
                 font-size: .94em !important;
+            }
+
+            .${BUTTON_CLASS}.${FORMULA_BUTTON_CLASS} {
+                margin-left: -10px !important;
             }
 
             #${PANEL_ID} {
@@ -911,13 +961,20 @@
         return text.length >= MIN_QUESTIONABLE_LENGTH;
     }
 
-    function makeAskButton(context) {
+    function isQuestionableFormula(element) {
+        if (element.querySelector(`:scope > .katex > .${BUTTON_CLASS}`)) return false;
+        if (element.closest('p, li, nav, header, footer, .study-checkpoint, .textbook-inspector, .textbook-rail')) return false;
+        return extractReadableText(element).length >= 3;
+    }
+
+    function makeAskButton(context, { formula = false } = {}) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = BUTTON_CLASS;
-        button.textContent = '✦';
-        button.title = '围绕这一段提问';
-        button.setAttribute('aria-label', '围绕这一段内容向 AI 提问');
+        if (formula) button.classList.add(FORMULA_BUTTON_CLASS);
+        button.innerHTML = AI_ICON_SVG;
+        button.title = formula ? '围绕这个公式提问' : '围绕这一段提问';
+        button.setAttribute('aria-label', formula ? '围绕这个公式向 AI 提问' : '围绕这一段内容向 AI 提问');
         button.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -934,7 +991,16 @@
             if (!isQuestionable(element)) return;
             const context = extractReadableText(element);
             element.setAttribute(DECORATED_ATTRIBUTE, 'true');
-            element.append(document.createTextNode(' '), makeAskButton(context));
+            element.append(makeAskButton(context));
+        });
+        content.querySelectorAll('.katex-display').forEach((element) => {
+            if (!isQuestionableFormula(element)) return;
+            const context = extractReadableText(element);
+            const formula = element.querySelector(':scope > .katex');
+            if (!formula) return;
+            element.setAttribute(DECORATED_ATTRIBUTE, 'true');
+            formula.classList.add(FORMULA_WRAPPER_CLASS);
+            formula.append(makeAskButton(context, { formula: true }));
         });
     }
 
@@ -953,10 +1019,10 @@
         root.hidden = true;
         root.innerHTML = `
             <div class="fulafu-study-ai-backdrop" data-action="close" aria-hidden="true"></div>
-            <button class="fulafu-study-ai-mini" type="button" data-action="restore" aria-label="展开学习 AI 助手" title="展开学习 AI 助手" hidden>✦</button>
+            <button class="fulafu-study-ai-mini" type="button" data-action="restore" aria-label="展开学习 AI 助手" title="展开学习 AI 助手" hidden>${AI_ICON_SVG}</button>
             <aside id="${PANEL_ID}" role="dialog" aria-modal="false" aria-labelledby="fulafu-study-ai-title">
                 <header class="fulafu-study-ai-header">
-                    <span class="fulafu-study-ai-brand-mark" aria-hidden="true">✦</span>
+                    <span class="fulafu-study-ai-brand-mark" aria-hidden="true">${AI_ICON_SVG}</span>
                     <strong class="fulafu-study-ai-heading" id="fulafu-study-ai-title">问 AI</strong>
                     <div class="fulafu-study-ai-header-actions">
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="连接设置" title="连接设置">⚙</button>
