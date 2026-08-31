@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.4
-// @lastUpdated  2026-08-31 14:28
+// @version      1.4.5
+// @lastUpdated  2026-08-31 17:51
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,8 +30,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.4';
-    const SCRIPT_RELEASED_AT = '2026-08-31 14:28:09 UTC+8';
+    const SCRIPT_VERSION = '1.4.5';
+    const SCRIPT_RELEASED_AT = '2026-08-31 17:51:13 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -53,6 +53,8 @@
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
     const AI_ICON_SVG = `<svg class="fulafu-study-ai-mark-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.5c.78 6.17 3.83 9.22 10.5 10.5-6.67 1.28-9.72 4.33-10.5 10.5C11.22 16.33 8.17 13.28 1.5 12 8.17 10.72 11.22 7.67 12 1.5Z"/></svg>`;
+    const SEND_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5m0 0-5 5m5-5 5 5"/></svg>`;
+    const STOP_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>`;
 
     let config = loadConfig();
     let elements = null;
@@ -680,29 +682,30 @@
 
         #${ROOT_ID} .fulafu-study-ai-composer {
             flex: 0 0 auto;
-            padding: 14px 16px max(14px, env(safe-area-inset-bottom));
-            background: rgba(251, 252, 251, .98);
+            padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+            background: rgba(251, 252, 251, .99);
             border-top: 1px solid rgba(38, 64, 52, .08);
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-card {
-            margin-bottom: 10px;
-            padding: 9px 10px;
-            background: #f0f4f1;
-            border: 1px solid rgba(41, 69, 56, .1);
-            border-radius: 11px;
+            margin: 0 4px 6px;
+            padding: 0 2px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-head {
             display: flex;
             align-items: center;
-            gap: 8px;
+            min-height: 26px;
+            gap: 7px;
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-label {
             flex: 0 0 auto;
             color: #2e6a50;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
         }
 
@@ -711,15 +714,15 @@
             flex: 1;
             overflow: hidden;
             color: #66736c;
-            font-size: 11px;
+            font-size: 12px;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-toggle {
-            min-height: 28px;
+            min-height: 26px;
             flex: 0 0 auto;
-            padding: 2px 5px;
+            padding: 2px 4px;
             color: #526159;
             background: transparent;
             border-radius: 7px;
@@ -745,16 +748,18 @@
             display: flex;
             align-items: flex-end;
             gap: 8px;
-            padding: 7px 7px 7px 12px;
-            background: #fff;
-            border: 1px solid rgba(41, 69, 56, .22);
-            border-radius: 15px;
-            box-shadow: 0 4px 16px rgba(27, 53, 41, .06);
+            padding: 6px 6px 6px 14px;
+            background: #f3f6f4;
+            border: 1px solid rgba(41, 69, 56, .13);
+            border-radius: 20px;
+            box-shadow: none;
+            transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
         }
 
         #${ROOT_ID} .fulafu-study-ai-question-shell:focus-within {
-            border-color: rgba(39, 105, 76, .55);
-            box-shadow: 0 0 0 3px rgba(39, 105, 76, .1);
+            background: #fff;
+            border-color: rgba(39, 105, 76, .46);
+            box-shadow: 0 0 0 3px rgba(39, 105, 76, .09);
         }
 
         #${ROOT_ID} .fulafu-study-ai-question {
@@ -767,28 +772,53 @@
             resize: none;
         }
 
+        #${ROOT_ID} .fulafu-study-ai-question:focus-visible {
+            outline: none !important;
+        }
+
         #${ROOT_ID} .fulafu-study-ai-send {
             display: grid;
-            width: 38px;
-            min-width: 38px;
-            height: 38px;
-            min-height: 38px;
+            width: 40px;
+            min-width: 40px;
+            height: 40px;
+            min-height: 40px;
             place-items: center;
             padding: 0;
             color: #fff;
             background: #2f6b51;
-            border-radius: 11px;
-            font-size: 20px;
+            border-radius: 50%;
             line-height: 1;
+            box-shadow: 0 3px 10px rgba(25, 67, 48, .18);
+            transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-send svg {
+            display: block;
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.9;
         }
 
         #${ROOT_ID} .fulafu-study-ai-send:hover {
             background: #275d46;
+            box-shadow: 0 4px 13px rgba(25, 67, 48, .24);
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-send:active {
+            transform: scale(.94);
         }
 
         #${ROOT_ID} .fulafu-study-ai-send[data-busy="true"] {
             background: #9a5b49;
-            font-size: 14px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-send[data-busy="true"] rect {
+            fill: currentColor;
+            stroke: none;
         }
 
         @media (max-width: 640px) {
@@ -862,12 +892,12 @@
             }
 
             #${ROOT_ID} .fulafu-study-ai-composer {
-                padding-inline: 12px;
+                padding: 9px 10px max(10px, env(safe-area-inset-bottom));
             }
 
             #${ROOT_ID} .fulafu-study-ai-context-toggle {
-                min-height: 32px;
-                padding-inline: 7px;
+                min-height: 30px;
+                padding-inline: 5px;
             }
 
             #${ROOT_ID} .fulafu-study-ai-send {
@@ -1129,8 +1159,8 @@
                                 <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前阅读上下文" hidden></textarea>
                             </div>
                             <div class="fulafu-study-ai-question-shell">
-                                <textarea class="fulafu-study-ai-question" data-question rows="1" aria-label="你的问题" placeholder="针对这段内容提问…"></textarea>
-                                <button class="fulafu-study-ai-send" type="button" data-action="send" aria-label="发送问题" title="发送">↑</button>
+                                <textarea class="fulafu-study-ai-question" data-question rows="1" aria-label="你的问题" placeholder="输入问题…"></textarea>
+                                <button class="fulafu-study-ai-send" type="button" data-action="send" aria-label="发送问题" title="发送">${SEND_ICON_SVG}</button>
                             </div>
                             <p class="fulafu-study-ai-status" data-request-status aria-live="polite"></p>
                         </section>
@@ -1284,7 +1314,9 @@
 
     function updateContextPreview() {
         if (!elements) return;
-        elements.contextPreview.textContent = normalizeSpace(elements.context.value) || '未选择内容';
+        const value = normalizeSpace(elements.context.value);
+        const labels = Array.from(value.matchAll(/【(上文|当前段落|当前公式|下文)】/g), (match) => match[1]);
+        elements.contextPreview.textContent = labels.length ? labels.join(' · ') : value || '未选择内容';
     }
 
     function toggleContextEditor() {
@@ -2070,7 +2102,7 @@
 
     function setBusy(isBusy) {
         elements.send.dataset.busy = isBusy ? 'true' : 'false';
-        elements.send.textContent = isBusy ? '■' : '↑';
+        elements.send.innerHTML = isBusy ? STOP_ICON_SVG : SEND_ICON_SVG;
         elements.send.setAttribute('aria-label', isBusy ? '停止回答' : '发送问题');
         elements.send.title = isBusy ? '停止' : '发送';
         elements.question.readOnly = isBusy;
