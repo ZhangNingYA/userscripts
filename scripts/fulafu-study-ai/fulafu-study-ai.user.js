@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.0
-// @lastUpdated  2026-08-31 10:26
+// @version      1.4.1
+// @lastUpdated  2026-08-31 11:18
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,8 +30,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.0';
-    const SCRIPT_RELEASED_AT = '2026-08-31 10:26:35 UTC+8';
+    const SCRIPT_VERSION = '1.4.1';
+    const SCRIPT_RELEASED_AT = '2026-08-31 11:18:44 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -169,7 +169,9 @@
             right: max(16px, env(safe-area-inset-right));
             bottom: max(16px, env(safe-area-inset-bottom));
             display: flex;
-            width: min(420px, calc(100vw - 32px));
+            width: min(560px, calc(100vw - 32px));
+            height: min(760px, calc(100vh - 32px));
+            height: min(760px, calc(100dvh - 32px));
             max-height: calc(100vh - 32px);
             max-height: calc(100dvh - 32px);
             min-width: 0;
@@ -181,6 +183,21 @@
             border-radius: 18px;
             box-shadow: 0 20px 70px rgba(17, 38, 29, .24);
             pointer-events: auto;
+        }
+
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-backdrop {
+            background: rgba(17, 25, 21, .42);
+            pointer-events: auto;
+            backdrop-filter: blur(3px);
+        }
+
+        #${ROOT_ID}[data-focus-mode="true"] #${PANEL_ID} {
+            inset: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+            width: auto;
+            height: auto;
+            max-height: none;
+            border-radius: 20px;
+            box-shadow: 0 24px 90px rgba(10, 25, 18, .34);
         }
 
         #${ROOT_ID} button,
@@ -249,6 +266,16 @@
             line-height: 1;
         }
 
+        #${ROOT_ID} .fulafu-study-ai-icon-button svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
         #${ROOT_ID} .fulafu-study-ai-icon-button:hover,
         #${ROOT_ID} .fulafu-study-ai-icon-button[data-active="true"] {
             color: #245b43;
@@ -259,6 +286,7 @@
         #${ROOT_ID} .fulafu-study-ai-chat-view {
             display: flex;
             min-height: 0;
+            flex: 1;
             flex-direction: column;
         }
 
@@ -267,8 +295,7 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-settings {
-            max-height: min(620px, calc(100vh - 92px));
-            max-height: min(620px, calc(100dvh - 92px));
+            flex: 1;
             padding: 18px;
             overflow-y: auto;
             overscroll-behavior: contain;
@@ -368,9 +395,8 @@
 
         #${ROOT_ID} .fulafu-study-ai-conversation {
             display: flex;
-            max-height: min(48vh, 440px);
-            max-height: min(48dvh, 440px);
             min-height: 0;
+            flex: 1;
             flex-direction: column;
             gap: 14px;
             padding: 16px 16px 4px;
@@ -381,6 +407,26 @@
 
         #${ROOT_ID} .fulafu-study-ai-conversation:empty {
             display: none;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-chat-view {
+            justify-content: flex-end;
+        }
+
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-conversation,
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-composer,
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-settings {
+            width: min(780px, 100%);
+            margin-inline: auto;
+        }
+
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-conversation {
+            padding: 28px 30px 10px;
+        }
+
+        #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-message[data-role="assistant"] {
+            font-size: 15px;
+            line-height: 1.78;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message {
@@ -577,6 +623,8 @@
         #${ROOT_ID} .fulafu-study-ai-composer {
             flex: 0 0 auto;
             padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+            background: rgba(251, 252, 251, .98);
+            border-top: 1px solid rgba(38, 64, 52, .08);
         }
 
         #${ROOT_ID} .fulafu-study-ai-context-card {
@@ -697,11 +745,22 @@
                 right: 0;
                 bottom: 0;
                 width: 100vw;
+                height: min(88vh, 760px);
+                height: min(88dvh, 760px);
                 max-height: calc(100vh - max(12px, env(safe-area-inset-top)));
                 max-height: calc(100dvh - max(12px, env(safe-area-inset-top)));
                 border-width: 1px 0 0;
                 border-radius: 20px 20px 0 0;
                 box-shadow: 0 -12px 50px rgba(17, 38, 29, .2);
+            }
+
+            #${ROOT_ID}[data-focus-mode="true"] #${PANEL_ID} {
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                height: 100dvh;
+                border-width: 0;
+                border-radius: 0;
             }
 
             #${ROOT_ID} .fulafu-study-ai-backdrop {
@@ -730,9 +789,8 @@
                 padding: 16px;
             }
 
-            #${ROOT_ID} .fulafu-study-ai-conversation {
-                max-height: min(50vh, 460px);
-                max-height: min(50dvh, 460px);
+            #${ROOT_ID} .fulafu-study-ai-conversation,
+            #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-conversation {
                 padding-inline: 14px;
             }
 
@@ -891,16 +949,18 @@
         root.id = ROOT_ID;
         root.dataset.version = SCRIPT_VERSION;
         root.dataset.releasedAt = SCRIPT_RELEASED_AT;
+        root.dataset.focusMode = 'false';
         root.hidden = true;
         root.innerHTML = `
             <div class="fulafu-study-ai-backdrop" data-action="close" aria-hidden="true"></div>
             <button class="fulafu-study-ai-mini" type="button" data-action="restore" aria-label="展开学习 AI 助手" title="展开学习 AI 助手" hidden>✦</button>
-            <aside id="${PANEL_ID}" role="dialog" aria-modal="true" aria-labelledby="fulafu-study-ai-title">
+            <aside id="${PANEL_ID}" role="dialog" aria-modal="false" aria-labelledby="fulafu-study-ai-title">
                 <header class="fulafu-study-ai-header">
                     <span class="fulafu-study-ai-brand-mark" aria-hidden="true">✦</span>
                     <strong class="fulafu-study-ai-heading" id="fulafu-study-ai-title">问 AI</strong>
                     <div class="fulafu-study-ai-header-actions">
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="连接设置" title="连接设置">⚙</button>
+                        <button class="fulafu-study-ai-icon-button" type="button" data-action="focus-mode" aria-label="进入专注模式" title="专注模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></button>
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="minimize" aria-label="缩小 AI 助手" title="缩小">−</button>
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="close" aria-label="关闭 AI 助手" title="关闭">×</button>
                     </div>
@@ -967,6 +1027,7 @@
             mini: root.querySelector('.fulafu-study-ai-mini'),
             title: root.querySelector('#fulafu-study-ai-title'),
             settingsButton: root.querySelector('[data-action="settings"]'),
+            focusButton: root.querySelector('[data-action="focus-mode"]'),
             settings: root.querySelector('.fulafu-study-ai-settings'),
             advanced: root.querySelector('[data-advanced]'),
             chatView: root.querySelector('[data-chat-view]'),
@@ -1009,6 +1070,7 @@
         if (action === 'close') closePanel();
         if (action === 'minimize') minimizePanel();
         if (action === 'restore') restorePanel();
+        if (action === 'focus-mode') setFocusMode(elements.root.dataset.focusMode !== 'true');
         if (action === 'settings') {
             if (elements.settings.hidden) showSettings();
             else hideSettings();
@@ -1078,7 +1140,7 @@
         elements.settings.hidden = false;
         elements.chatView.hidden = true;
         elements.settingsButton.dataset.active = 'true';
-        elements.title.textContent = '连接设置';
+        updatePanelHeading();
         setStatus(elements.settingsStatus);
         if (focus) window.setTimeout(() => (config.apiKey ? elements.model : elements.apiKey).focus(), 0);
     }
@@ -1088,7 +1150,7 @@
         elements.settings.hidden = true;
         elements.chatView.hidden = false;
         elements.settingsButton.dataset.active = 'false';
-        elements.title.textContent = '问 AI';
+        updatePanelHeading();
         if (focus) focusVisiblePanelControl();
     }
 
@@ -1119,11 +1181,31 @@
         elements.question.style.height = `${Math.min(elements.question.scrollHeight, 144)}px`;
     }
 
+    function updatePanelHeading() {
+        if (!elements) return;
+        if (!elements.settings.hidden) elements.title.textContent = '连接设置';
+        else elements.title.textContent = elements.root.dataset.focusMode === 'true' ? '专注阅读' : '问 AI';
+    }
+
+    function setFocusMode(enabled) {
+        if (!elements) return;
+        const isEnabled = Boolean(enabled);
+        elements.root.dataset.focusMode = isEnabled ? 'true' : 'false';
+        elements.focusButton.dataset.active = isEnabled ? 'true' : 'false';
+        elements.focusButton.setAttribute('aria-label', isEnabled ? '退出专注模式' : '进入专注模式');
+        elements.focusButton.title = isEnabled ? '退出专注模式' : '专注模式';
+        elements.panel.setAttribute('aria-modal', isEnabled || window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
+        updatePanelHeading();
+        if (!elements.settings.hidden) elements.settings.scrollTop = 0;
+        else elements.conversation.scrollTop = elements.conversation.scrollHeight;
+    }
+
     function showPanelChrome() {
         elements.root.hidden = false;
         elements.backdrop.hidden = false;
         elements.panel.hidden = false;
         elements.mini.hidden = true;
+        elements.panel.setAttribute('aria-modal', elements.root.dataset.focusMode === 'true' || window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
     }
 
     function minimizePanel() {
@@ -1170,6 +1252,7 @@
 
     function closePanel() {
         if (!elements || elements.root.hidden) return;
+        setFocusMode(false);
         elements.root.hidden = true;
         document.documentElement.style.removeProperty('--fulafu-study-ai-panel-open');
         if (lastFocusedElement?.isConnected) lastFocusedElement.focus();
@@ -1949,7 +2032,8 @@
     function handleGlobalKeydown(event) {
         if (event.key !== 'Escape' || !elements || elements.root.hidden) return;
         event.preventDefault();
-        closePanel();
+        if (elements.root.dataset.focusMode === 'true') setFocusMode(false);
+        else closePanel();
     }
 
     function init() {
