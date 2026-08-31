@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.3.0
-// @lastUpdated  2026-08-30 22:48
+// @version      1.4.0
+// @lastUpdated  2026-08-31 10:26
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -16,8 +16,11 @@
 // @match        https://www.fulafu.com/study/*
 // @match        https://fulafu.com/study/*
 // @run-at       document-idle
+// @require      https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js
+// @resource     FULAFU_STUDY_AI_KATEX_CSS https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css
 // @grant        GM_addStyle
 // @grant        GM_getValue
+// @grant        GM_getResourceText
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
@@ -27,19 +30,23 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.3.0';
-    const SCRIPT_RELEASED_AT = '2026-08-30 22:48:23 UTC+8';
+    const SCRIPT_VERSION = '1.4.0';
+    const SCRIPT_RELEASED_AT = '2026-08-31 10:26:35 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
     const BUTTON_CLASS = 'fulafu-study-ai-ask';
     const DECORATED_ATTRIBUTE = 'data-fulafu-study-ai-ready';
     const STORAGE_KEY = 'fulafu-study-ai-config-v1';
+    const KATEX_RESOURCE_NAME = 'FULAFU_STUDY_AI_KATEX_CSS';
+    const KATEX_ASSET_BASE = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/';
     const DEFAULT_CONFIG = Object.freeze({
         endpoint: 'https://api.openai.com/v1/responses',
         model: 'gpt-5.6',
+        reasoningEffort: 'default',
         apiKey: ''
     });
+    const REASONING_EFFORTS = new Set(['default', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     const MAX_CONTEXT_LENGTH = 12000;
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
@@ -52,6 +59,7 @@
     let lastFocusedElement = null;
     let decorationFrame = 0;
     let contextRevision = 0;
+    const assistantRenderStates = new WeakMap();
 
     const css = String.raw`
         .${BUTTON_CLASS} {
@@ -95,6 +103,7 @@
         .${BUTTON_CLASS}:focus-visible,
         #${ROOT_ID} button:focus-visible,
         #${ROOT_ID} input:focus-visible,
+        #${ROOT_ID} select:focus-visible,
         #${ROOT_ID} textarea:focus-visible {
             outline: 3px solid rgba(41, 105, 77, .28) !important;
             outline-offset: 2px !important;
@@ -176,6 +185,7 @@
 
         #${ROOT_ID} button,
         #${ROOT_ID} input,
+        #${ROOT_ID} select,
         #${ROOT_ID} textarea {
             color: inherit;
             font: inherit;
@@ -278,6 +288,7 @@
         }
 
         #${ROOT_ID} .fulafu-study-ai-field input,
+        #${ROOT_ID} .fulafu-study-ai-field select,
         #${ROOT_ID} .fulafu-study-ai-context,
         #${ROOT_ID} .fulafu-study-ai-question {
             display: block;
@@ -288,11 +299,16 @@
             outline: 0;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-field input {
+        #${ROOT_ID} .fulafu-study-ai-field input,
+        #${ROOT_ID} .fulafu-study-ai-field select {
             min-height: 44px;
             margin-top: 6px;
             padding: 10px 12px;
             border-radius: 11px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-field select {
+            appearance: auto;
         }
 
         #${ROOT_ID} .fulafu-study-ai-advanced {
@@ -386,12 +402,176 @@
             max-width: 100%;
             padding: 2px 3px;
             color: #26332d;
+            line-height: 1.68;
+            white-space: normal;
         }
 
         #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"]:empty::after {
             content: "•••";
             color: #809087;
             letter-spacing: 3px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] > :first-child {
+            margin-top: 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] > :last-child {
+            margin-bottom: 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] p,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] ul,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] ol,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] blockquote,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] pre,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] table,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] .fulafu-study-ai-math-block {
+            margin: .72em 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h1,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h2,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h3,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h4,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h5,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h6 {
+            margin: 1em 0 .5em;
+            color: #20372c;
+            font-weight: 750;
+            line-height: 1.35;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h1 {
+            font-size: 1.28em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h2 {
+            font-size: 1.18em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h3,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h4,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h5,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] h6 {
+            font-size: 1.06em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] ul,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] ol {
+            padding-left: 1.45em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] li + li {
+            margin-top: .35em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] blockquote {
+            padding: .1em 0 .1em .85em;
+            color: #58675f;
+            border-left: 3px solid #a9c7b8;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] code {
+            padding: .14em .38em;
+            color: #284d3c;
+            background: #edf2ef;
+            border-radius: 5px;
+            font: .9em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] pre {
+            max-width: 100%;
+            padding: 11px 12px;
+            overflow: auto;
+            color: #e7eee9;
+            background: #26342d;
+            border-radius: 10px;
+            white-space: pre;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] pre code {
+            padding: 0;
+            color: inherit;
+            background: transparent;
+            border-radius: 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] a {
+            color: #21674a;
+            text-decoration: underline;
+            text-decoration-color: rgba(33, 103, 74, .35);
+            text-underline-offset: 2px;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] hr {
+            height: 1px;
+            margin: 1em 0;
+            background: rgba(41, 69, 56, .16);
+            border: 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-table-wrap {
+            max-width: 100%;
+            margin: .72em 0;
+            overflow-x: auto;
+            border: 1px solid rgba(41, 69, 56, .15);
+            border-radius: 9px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] table {
+            width: 100%;
+            min-width: 280px;
+            margin: 0;
+            border-collapse: collapse;
+            font-size: .92em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] th,
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] td {
+            padding: 7px 9px;
+            text-align: left;
+            vertical-align: top;
+            border-bottom: 1px solid rgba(41, 69, 56, .12);
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] th {
+            color: #294a3b;
+            background: #eef3f0;
+            font-weight: 700;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-message[data-role="assistant"] tr:last-child td {
+            border-bottom: 0;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-math-inline {
+            display: inline-block;
+            max-width: 100%;
+            padding: 0 .05em;
+            vertical-align: -.12em;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-math-block {
+            max-width: 100%;
+            padding: 4px 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            text-align: center;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-math-block .katex-display {
+            margin: 0;
+            text-align: center;
+        }
+
+        #${ROOT_ID} .fulafu-study-ai-math-fallback {
+            color: #5c4941;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            white-space: pre-wrap;
         }
 
         #${ROOT_ID} .fulafu-study-ai-composer {
@@ -603,18 +783,35 @@
     function loadConfig() {
         const stored = safeGetValue(STORAGE_KEY, null);
         if (!stored || typeof stored !== 'object') return { ...DEFAULT_CONFIG };
+        const storedEndpoint = typeof stored.endpoint === 'string' && stored.endpoint.trim() ? stored.endpoint.trim() : DEFAULT_CONFIG.endpoint;
         const storedModel = typeof stored.model === 'string' ? stored.model.trim() : '';
+        const model = storedModel === 'gpt-5.6-luna' && storedEndpoint === DEFAULT_CONFIG.endpoint ? DEFAULT_CONFIG.model : storedModel || DEFAULT_CONFIG.model;
+        const storedReasoningEffort = typeof stored.reasoningEffort === 'string' ? stored.reasoningEffort.trim().toLowerCase() : '';
         return {
-            endpoint: typeof stored.endpoint === 'string' && stored.endpoint.trim() ? stored.endpoint.trim() : DEFAULT_CONFIG.endpoint,
-            model: storedModel && storedModel !== 'gpt-5.6-luna' ? storedModel : DEFAULT_CONFIG.model,
+            endpoint: storedEndpoint,
+            model,
+            reasoningEffort: REASONING_EFFORTS.has(storedReasoningEffort) ? storedReasoningEffort : DEFAULT_CONFIG.reasoningEffort,
             apiKey: typeof stored.apiKey === 'string' ? stored.apiKey.trim() : ''
         };
     }
 
+    function getKatexCss() {
+        try {
+            if (typeof GM_getResourceText !== 'function') return '';
+            const resource = GM_getResourceText(KATEX_RESOURCE_NAME);
+            if (typeof resource !== 'string') return '';
+            return resource.replace(/url\((['"]?)fonts\//g, `url($1${KATEX_ASSET_BASE}fonts/`);
+        } catch (error) {
+            console.warn('[Fulafu Study AI] Unable to load bundled KaTeX styles.', error);
+            return '';
+        }
+    }
+
     function addStyle() {
+        const styles = `${getKatexCss()}\n${css}`;
         try {
             if (typeof GM_addStyle === 'function') {
-                GM_addStyle(css);
+                GM_addStyle(styles);
                 return;
             }
         } catch (error) {
@@ -623,7 +820,7 @@
         if (document.getElementById(STYLE_ID)) return;
         const style = document.createElement('style');
         style.id = STYLE_ID;
-        style.textContent = css;
+        style.textContent = styles;
         (document.head || document.documentElement).append(style);
     }
 
@@ -717,6 +914,18 @@
                         <label class="fulafu-study-ai-field">模型
                             <input type="text" name="model" autocomplete="off" spellcheck="false">
                         </label>
+                        <label class="fulafu-study-ai-field">推理强度
+                            <select name="reasoningEffort">
+                                <option value="default">自动（模型默认）</option>
+                                <option value="none">none（关闭）</option>
+                                <option value="minimal">minimal（最低）</option>
+                                <option value="low">low（低）</option>
+                                <option value="medium">medium（中）</option>
+                                <option value="high">high（高）</option>
+                                <option value="xhigh">xhigh（超高）</option>
+                                <option value="max">max（最大）</option>
+                            </select>
+                        </label>
                         <details class="fulafu-study-ai-advanced" data-advanced>
                             <summary>高级设置</summary>
                             <label class="fulafu-study-ai-field">接口地址
@@ -764,6 +973,7 @@
             apiKey: root.querySelector('[name="apiKey"]'),
             endpoint: root.querySelector('[name="endpoint"]'),
             model: root.querySelector('[name="model"]'),
+            reasoningEffort: root.querySelector('[name="reasoningEffort"]'),
             settingsStatus: root.querySelector('[data-settings-status]'),
             conversation: root.querySelector('[data-conversation]'),
             context: root.querySelector('[data-context]'),
@@ -817,6 +1027,7 @@
         elements.apiKey.value = config.apiKey;
         elements.endpoint.value = config.endpoint;
         elements.model.value = config.model;
+        elements.reasoningEffort.value = config.reasoningEffort;
         elements.advanced.open = config.endpoint !== DEFAULT_CONFIG.endpoint;
     }
 
@@ -838,9 +1049,11 @@
         const apiKey = elements.apiKey.value.trim();
         const endpoint = validateEndpoint(elements.endpoint.value.trim());
         const model = elements.model.value.trim();
+        const reasoningEffort = elements.reasoningEffort.value;
         if (!apiKey) throw new Error('请先填写 API Key。');
         if (!model) throw new Error('请填写模型名称。');
-        return { apiKey, endpoint, model };
+        if (!REASONING_EFFORTS.has(reasoningEffort)) throw new Error('请选择有效的推理强度。');
+        return { apiKey, endpoint, model, reasoningEffort };
     }
 
     function setStatus(target, message = '', kind = '') {
@@ -972,6 +1185,437 @@
         return message;
     }
 
+    function isEscaped(value, index) {
+        let slashCount = 0;
+        for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) slashCount += 1;
+        return slashCount % 2 === 1;
+    }
+
+    function findClosingDelimiter(value, delimiter, fromIndex) {
+        let cursor = fromIndex;
+        while (cursor < value.length) {
+            const found = value.indexOf(delimiter, cursor);
+            if (found === -1) return -1;
+            if (!isEscaped(value, found)) return found;
+            cursor = found + delimiter.length;
+        }
+        return -1;
+    }
+
+    function safeLinkUrl(value) {
+        try {
+            const parsed = new URL(value, window.location.href);
+            if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) return '';
+            return parsed.href;
+        } catch {
+            return '';
+        }
+    }
+
+    function mathNode(tex, displayMode) {
+        const node = document.createElement(displayMode ? 'div' : 'span');
+        node.className = displayMode ? 'fulafu-study-ai-math-block' : 'fulafu-study-ai-math-inline';
+        node.setAttribute('aria-label', tex);
+        try {
+            const renderer = globalThis.katex;
+            if (!renderer || typeof renderer.render !== 'function') throw new Error('KaTeX is unavailable.');
+            renderer.render(tex, node, {
+                displayMode,
+                throwOnError: false,
+                strict: 'ignore',
+                trust: false,
+                output: 'htmlAndMathml'
+            });
+        } catch (error) {
+            node.classList.add('fulafu-study-ai-math-fallback');
+            node.textContent = displayMode ? `$$${tex}$$` : `$${tex}$`;
+            console.warn('[Fulafu Study AI] Unable to render formula.', error);
+        }
+        return node;
+    }
+
+    function appendInlineMarkdown(parent, source) {
+        const value = String(source || '');
+        let cursor = 0;
+        let buffer = '';
+        const flush = () => {
+            if (!buffer) return;
+            parent.append(document.createTextNode(buffer));
+            buffer = '';
+        };
+        const appendWrapped = (tagName, content) => {
+            const element = document.createElement(tagName);
+            appendInlineMarkdown(element, content);
+            parent.append(element);
+        };
+
+        while (cursor < value.length) {
+            if (value.startsWith('\\(', cursor) && !isEscaped(value, cursor)) {
+                const closing = findClosingDelimiter(value, '\\)', cursor + 2);
+                if (closing !== -1) {
+                    flush();
+                    parent.append(mathNode(value.slice(cursor + 2, closing).trim(), false));
+                    cursor = closing + 2;
+                    continue;
+                }
+            }
+
+            if (value[cursor] === '$' && value[cursor + 1] !== '$' && !isEscaped(value, cursor) && !/\s/.test(value[cursor + 1] || '')) {
+                const closing = findClosingDelimiter(value, '$', cursor + 1);
+                if (closing !== -1 && !/\s/.test(value[closing - 1] || '')) {
+                    flush();
+                    parent.append(mathNode(value.slice(cursor + 1, closing), false));
+                    cursor = closing + 1;
+                    continue;
+                }
+            }
+
+            if (value[cursor] === '`') {
+                const ticks = value.slice(cursor).match(/^`+/)?.[0] || '`';
+                const closing = value.indexOf(ticks, cursor + ticks.length);
+                if (closing !== -1) {
+                    flush();
+                    const code = document.createElement('code');
+                    code.textContent = value.slice(cursor + ticks.length, closing).replace(/^ | $/g, '');
+                    parent.append(code);
+                    cursor = closing + ticks.length;
+                    continue;
+                }
+            }
+
+            const linkMatch = value.slice(cursor).match(/^(!?)\[([^\]]+)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)/);
+            if (linkMatch) {
+                const href = safeLinkUrl(linkMatch[3]);
+                if (href) {
+                    flush();
+                    const link = document.createElement('a');
+                    link.href = href;
+                    link.rel = 'noopener noreferrer';
+                    if (href.startsWith('http')) link.target = '_blank';
+                    appendInlineMarkdown(link, linkMatch[2]);
+                    if (linkMatch[1]) link.setAttribute('aria-label', `图片：${linkMatch[2]}`);
+                    parent.append(link);
+                    cursor += linkMatch[0].length;
+                    continue;
+                }
+            }
+
+            const autoLinkMatch = value.slice(cursor).match(/^<(https?:\/\/[^>]+|mailto:[^>]+)>/i);
+            if (autoLinkMatch) {
+                const href = safeLinkUrl(autoLinkMatch[1]);
+                if (href) {
+                    flush();
+                    const link = document.createElement('a');
+                    link.href = href;
+                    link.rel = 'noopener noreferrer';
+                    link.target = href.startsWith('http') ? '_blank' : '';
+                    link.textContent = autoLinkMatch[1];
+                    parent.append(link);
+                    cursor += autoLinkMatch[0].length;
+                    continue;
+                }
+            }
+
+            const strongDelimiter = value.startsWith('**', cursor) ? '**' : value.startsWith('__', cursor) ? '__' : '';
+            if (strongDelimiter) {
+                const closing = findClosingDelimiter(value, strongDelimiter, cursor + 2);
+                if (closing > cursor + 2) {
+                    flush();
+                    appendWrapped('strong', value.slice(cursor + 2, closing));
+                    cursor = closing + 2;
+                    continue;
+                }
+            }
+
+            if (value.startsWith('~~', cursor)) {
+                const closing = findClosingDelimiter(value, '~~', cursor + 2);
+                if (closing > cursor + 2) {
+                    flush();
+                    appendWrapped('del', value.slice(cursor + 2, closing));
+                    cursor = closing + 2;
+                    continue;
+                }
+            }
+
+            if ((value[cursor] === '*' || value[cursor] === '_') && !isEscaped(value, cursor)) {
+                const delimiter = value[cursor];
+                const previous = value[cursor - 1] || '';
+                const next = value[cursor + 1] || '';
+                const allowEmphasis = delimiter === '*' || !(/[\p{L}\p{N}]/u.test(previous) && /[\p{L}\p{N}]/u.test(next));
+                const closing = allowEmphasis ? findClosingDelimiter(value, delimiter, cursor + 1) : -1;
+                if (closing > cursor + 1) {
+                    flush();
+                    appendWrapped('em', value.slice(cursor + 1, closing));
+                    cursor = closing + 1;
+                    continue;
+                }
+            }
+
+            if (value[cursor] === '\\' && cursor + 1 < value.length && /[\\`*{}\[\]()#+.!_$|>~-]/.test(value[cursor + 1])) {
+                buffer += value[cursor + 1];
+                cursor += 2;
+                continue;
+            }
+
+            if (value[cursor] === '\n') {
+                flush();
+                parent.append(document.createElement('br'));
+                cursor += 1;
+                continue;
+            }
+
+            buffer += value[cursor];
+            cursor += 1;
+        }
+        flush();
+    }
+
+    function splitTableRow(line) {
+        let value = String(line || '').trim();
+        if (value.startsWith('|')) value = value.slice(1);
+        if (value.endsWith('|') && !isEscaped(value, value.length - 1)) value = value.slice(0, -1);
+        const cells = [];
+        let cell = '';
+        let inCode = false;
+        for (let cursor = 0; cursor < value.length; cursor += 1) {
+            const character = value[cursor];
+            if (character === '`' && !isEscaped(value, cursor)) inCode = !inCode;
+            if (character === '|' && !inCode && !isEscaped(value, cursor)) {
+                cells.push(cell.trim());
+                cell = '';
+            } else if (character === '\\' && value[cursor + 1] === '|') {
+                cell += '|';
+                cursor += 1;
+            } else {
+                cell += character;
+            }
+        }
+        cells.push(cell.trim());
+        return cells;
+    }
+
+    function tableAlignments(line) {
+        const cells = splitTableRow(line);
+        if (!cells.length || cells.some((cell) => !/^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))) return null;
+        return cells.map((cell) => {
+            const clean = cell.replace(/\s+/g, '');
+            if (clean.startsWith(':') && clean.endsWith(':')) return 'center';
+            if (clean.endsWith(':')) return 'right';
+            return 'left';
+        });
+    }
+
+    function isMarkdownBlockStart(lines, index) {
+        const line = lines[index] || '';
+        const trimmed = line.trim();
+        if (!trimmed) return true;
+        if (/^(```|~~~)/.test(trimmed)) return true;
+        if (/^#{1,6}\s+/.test(trimmed)) return true;
+        if (/^>\s?/.test(trimmed)) return true;
+        if (/^([-+*])\s+/.test(trimmed) || /^\d+[.)]\s+/.test(trimmed)) return true;
+        if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed.replace(/\s+/g, ''))) return true;
+        if (trimmed.startsWith('$$') || trimmed.startsWith('\\[')) return true;
+        return Boolean(lines[index + 1] && line.includes('|') && tableAlignments(lines[index + 1]));
+    }
+
+    function tableNode(headerCells, alignments, rows) {
+        const wrap = document.createElement('div');
+        wrap.className = 'fulafu-study-ai-table-wrap';
+        const table = document.createElement('table');
+        const head = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        headerCells.forEach((cell, index) => {
+            const heading = document.createElement('th');
+            heading.style.textAlign = alignments[index] || 'left';
+            appendInlineMarkdown(heading, cell);
+            headRow.append(heading);
+        });
+        head.append(headRow);
+        table.append(head);
+        if (rows.length) {
+            const body = document.createElement('tbody');
+            rows.forEach((cells) => {
+                const row = document.createElement('tr');
+                headerCells.forEach((unused, index) => {
+                    const cell = document.createElement('td');
+                    cell.style.textAlign = alignments[index] || 'left';
+                    appendInlineMarkdown(cell, cells[index] || '');
+                    row.append(cell);
+                });
+                body.append(row);
+            });
+            table.append(body);
+        }
+        wrap.append(table);
+        return wrap;
+    }
+
+    function markdownFragment(markdown) {
+        const fragment = document.createDocumentFragment();
+        const lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
+        let index = 0;
+
+        while (index < lines.length) {
+            const line = lines[index];
+            const trimmed = line.trim();
+            if (!trimmed) {
+                index += 1;
+                continue;
+            }
+
+            const fenceMatch = trimmed.match(/^(`{3,}|~{3,})\s*([\w.+-]*)\s*$/);
+            if (fenceMatch) {
+                const fence = fenceMatch[1];
+                const language = fenceMatch[2];
+                const codeLines = [];
+                index += 1;
+                while (index < lines.length && !lines[index].trim().startsWith(fence)) {
+                    codeLines.push(lines[index]);
+                    index += 1;
+                }
+                if (index < lines.length) index += 1;
+                const pre = document.createElement('pre');
+                const code = document.createElement('code');
+                if (language) code.className = `language-${language.replace(/[^\w-]/g, '')}`;
+                code.textContent = codeLines.join('\n');
+                pre.append(code);
+                fragment.append(pre);
+                continue;
+            }
+
+            if (trimmed.startsWith('$$') || trimmed.startsWith('\\[')) {
+                const opener = trimmed.startsWith('$$') ? '$$' : '\\[';
+                const closer = opener === '$$' ? '$$' : '\\]';
+                let content = trimmed.slice(opener.length);
+                const sameLineClosing = content.lastIndexOf(closer);
+                if (sameLineClosing !== -1) {
+                    content = content.slice(0, sameLineClosing);
+                    index += 1;
+                } else {
+                    const formulaLines = content ? [content] : [];
+                    index += 1;
+                    while (index < lines.length) {
+                        const closingIndex = lines[index].lastIndexOf(closer);
+                        if (closingIndex !== -1) {
+                            formulaLines.push(lines[index].slice(0, closingIndex));
+                            index += 1;
+                            break;
+                        }
+                        formulaLines.push(lines[index]);
+                        index += 1;
+                    }
+                    content = formulaLines.join('\n');
+                }
+                fragment.append(mathNode(content.trim(), true));
+                continue;
+            }
+
+            const headingMatch = trimmed.match(/^(#{1,6})\s+(.+?)\s*#*$/);
+            if (headingMatch) {
+                const heading = document.createElement(`h${headingMatch[1].length}`);
+                appendInlineMarkdown(heading, headingMatch[2]);
+                fragment.append(heading);
+                index += 1;
+                continue;
+            }
+
+            if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed.replace(/\s+/g, ''))) {
+                fragment.append(document.createElement('hr'));
+                index += 1;
+                continue;
+            }
+
+            const alignments = lines[index + 1] ? tableAlignments(lines[index + 1]) : null;
+            if (line.includes('|') && alignments) {
+                const headerCells = splitTableRow(line);
+                const rows = [];
+                index += 2;
+                while (index < lines.length && lines[index].trim() && lines[index].includes('|')) {
+                    rows.push(splitTableRow(lines[index]));
+                    index += 1;
+                }
+                fragment.append(tableNode(headerCells, alignments, rows));
+                continue;
+            }
+
+            if (/^>\s?/.test(trimmed)) {
+                const quoteLines = [];
+                while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+                    quoteLines.push(lines[index].replace(/^\s*>\s?/, ''));
+                    index += 1;
+                }
+                const quote = document.createElement('blockquote');
+                quote.append(markdownFragment(quoteLines.join('\n')));
+                fragment.append(quote);
+                continue;
+            }
+
+            const unorderedMatch = trimmed.match(/^[-+*]\s+(.+)$/);
+            const orderedMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
+            if (unorderedMatch || orderedMatch) {
+                const ordered = Boolean(orderedMatch);
+                const list = document.createElement(ordered ? 'ol' : 'ul');
+                while (index < lines.length) {
+                    const itemLine = lines[index].trim();
+                    const itemMatch = ordered ? itemLine.match(/^\d+[.)]\s+(.+)$/) : itemLine.match(/^[-+*]\s+(.+)$/);
+                    if (!itemMatch) break;
+                    const item = document.createElement('li');
+                    appendInlineMarkdown(item, itemMatch[1]);
+                    list.append(item);
+                    index += 1;
+                }
+                fragment.append(list);
+                continue;
+            }
+
+            const paragraphLines = [];
+            while (index < lines.length && lines[index].trim() && (paragraphLines.length === 0 || !isMarkdownBlockStart(lines, index))) {
+                paragraphLines.push(lines[index].trim());
+                index += 1;
+            }
+            if (!paragraphLines.length) {
+                paragraphLines.push(trimmed);
+                index += 1;
+            }
+            const paragraph = document.createElement('p');
+            const content = paragraphLines.map((part, partIndex) => {
+                if (partIndex === paragraphLines.length - 1) return part;
+                return part.endsWith('  ') ? `${part.trimEnd()}\n` : `${part} `;
+            }).join('');
+            appendInlineMarkdown(paragraph, content);
+            fragment.append(paragraph);
+        }
+
+        return fragment;
+    }
+
+    function renderAssistantMessage(message, markdown) {
+        const state = assistantRenderStates.get(message);
+        if (state?.frame) window.cancelAnimationFrame(state.frame);
+        assistantRenderStates.delete(message);
+        message.replaceChildren(markdownFragment(markdown));
+    }
+
+    function scheduleAssistantMessageRender(message, markdown) {
+        const state = assistantRenderStates.get(message) || { frame: 0, markdown: '' };
+        state.markdown = markdown;
+        if (!state.frame) {
+            state.frame = window.requestAnimationFrame(() => {
+                const latest = assistantRenderStates.get(message);
+                if (!latest) return;
+                latest.frame = 0;
+                message.replaceChildren(markdownFragment(latest.markdown));
+            });
+        }
+        assistantRenderStates.set(message, state);
+    }
+
+    function cancelAssistantMessageRender(message) {
+        const state = assistantRenderStates.get(message);
+        if (state?.frame) window.cancelAnimationFrame(state.frame);
+        assistantRenderStates.delete(message);
+    }
+
     function getPromptContext() {
         const value = normalizeSpace(elements.context.value).slice(0, MAX_CONTEXT_LENGTH);
         if (!value) throw new Error('当前段落为空，请先填写要讨论的内容。');
@@ -1009,8 +1653,9 @@
 
     function responsePayload() {
         const sessionHistory = history.map(apiHistoryItem);
+        const reasoningEffort = config.reasoningEffort !== 'default' ? config.reasoningEffort : '';
         if (isResponsesEndpoint(config.endpoint)) {
-            return {
+            const payload = {
                 model: config.model,
                 instructions: buildInstructions(),
                 input: sessionHistory,
@@ -1018,8 +1663,10 @@
                 store: false,
                 stream: true
             };
+            if (reasoningEffort) payload.reasoning = { effort: reasoningEffort };
+            return payload;
         }
-        return {
+        const payload = {
             model: config.model,
             messages: [
                 { role: 'system', content: buildInstructions() },
@@ -1028,6 +1675,8 @@
             max_tokens: 1600,
             stream: true
         };
+        if (reasoningEffort) payload.reasoning_effort = reasoningEffort;
+        return payload;
     }
 
     function parseApiResponse(data) {
@@ -1254,19 +1903,20 @@
         try {
             const requestPromise = requestAI(responsePayload(), (partialAnswer) => {
                 if (revision !== contextRevision) return;
-                assistantMessage.textContent = partialAnswer;
+                scheduleAssistantMessageRender(assistantMessage, partialAnswer);
                 elements.conversation.scrollTop = elements.conversation.scrollHeight;
             });
             requestForTurn = activeRequest;
             const answer = await requestPromise;
             if (revision !== contextRevision) return;
-            assistantMessage.textContent = answer;
+            renderAssistantMessage(assistantMessage, answer);
             history.push({ role: 'assistant', content: answer });
             setStatus(elements.requestStatus);
         } catch (error) {
             const entryIndex = history.indexOf(userEntry);
             if (entryIndex !== -1) history.splice(entryIndex, 1);
             userMessage.remove();
+            cancelAssistantMessageRender(assistantMessage);
             assistantMessage.remove();
             if (revision !== contextRevision) return;
             elements.question.value = question;
