@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.2
-// @lastUpdated  2026-08-31 11:30
+// @version      1.4.3
+// @lastUpdated  2026-08-31 11:51
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,8 +30,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.2';
-    const SCRIPT_RELEASED_AT = '2026-08-31 11:30:04 UTC+8';
+    const SCRIPT_VERSION = '1.4.3';
+    const SCRIPT_RELEASED_AT = '2026-08-31 11:51:40 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -52,7 +52,7 @@
     const MAX_CONTEXT_LENGTH = 12000;
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
-    const AI_ICON_SVG = `<svg class="fulafu-study-ai-face-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.75c-6.05 0-10.5 3.8-10.5 8.95 0 2.72 1.27 5.11 3.55 6.68l-.85 3.9a.75.75 0 0 0 1.06.83l4.06-2.08c.87.21 1.77.32 2.68.32 6.05 0 10.5-3.8 10.5-8.95S18.05 1.75 12 1.75Z"/><circle cx="8.7" cy="10.35" r="1.1" fill="var(--fulafu-study-ai-face-color, #fff)"/><circle cx="15.3" cy="10.35" r="1.1" fill="var(--fulafu-study-ai-face-color, #fff)"/><path d="M8.75 13.55c.82.88 1.9 1.32 3.25 1.32s2.43-.44 3.25-1.32" fill="none" stroke="var(--fulafu-study-ai-face-color, #fff)" stroke-linecap="round" stroke-width="1.5"/></svg>`;
+    const AI_ICON_SVG = `<svg class="fulafu-study-ai-mark-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.5c.78 6.17 3.83 9.22 10.5 10.5-6.67 1.28-9.72 4.33-10.5 10.5C11.22 16.33 8.17 13.28 1.5 12 8.17 10.72 11.22 7.67 12 1.5Z"/></svg>`;
 
     let config = loadConfig();
     let elements = null;
@@ -93,7 +93,7 @@
             transition: opacity 140ms ease, transform 140ms ease !important;
         }
 
-        .${BUTTON_CLASS} .fulafu-study-ai-face-icon {
+        .${BUTTON_CLASS} .fulafu-study-ai-mark-icon {
             display: block !important;
             width: 1.1em !important;
             height: 1.1em !important;
@@ -192,10 +192,9 @@
             font-size: 19px;
             line-height: 1;
             pointer-events: auto;
-            --fulafu-study-ai-face-color: #2f6b51;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-mini .fulafu-study-ai-face-icon {
+        #${ROOT_ID} .fulafu-study-ai-mini .fulafu-study-ai-mark-icon {
             width: 27px;
             height: 27px;
         }
@@ -226,18 +225,32 @@
         }
 
         #${ROOT_ID}[data-focus-mode="true"] .fulafu-study-ai-backdrop {
-            background: rgba(17, 25, 21, .42);
-            pointer-events: auto;
-            backdrop-filter: blur(3px);
+            background: transparent;
+            pointer-events: none;
+            backdrop-filter: none;
         }
 
-        #${ROOT_ID}[data-focus-mode="true"] #${PANEL_ID} {
-            inset: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
-            width: auto;
-            height: auto;
-            max-height: none;
-            border-radius: 20px;
-            box-shadow: 0 24px 90px rgba(10, 25, 18, .34);
+        #${ROOT_ID}:not([data-focus-mode="true"]) [data-action="panel-side"] {
+            display: none;
+        }
+
+        @media (min-width: 641px) {
+            #${ROOT_ID}[data-focus-mode="true"] #${PANEL_ID} {
+                top: max(18px, env(safe-area-inset-top));
+                right: max(18px, env(safe-area-inset-right));
+                bottom: max(18px, env(safe-area-inset-bottom));
+                left: auto;
+                width: min(760px, calc(100vw - 36px));
+                height: auto;
+                max-height: none;
+                border-radius: 20px;
+                box-shadow: 0 22px 72px rgba(10, 25, 18, .28);
+            }
+
+            #${ROOT_ID}[data-focus-mode="true"][data-panel-side="left"] #${PANEL_ID} {
+                right: auto;
+                left: max(18px, env(safe-area-inset-left));
+            }
         }
 
         #${ROOT_ID} button,
@@ -278,10 +291,9 @@
             border-radius: 9px;
             font-size: 15px;
             line-height: 1;
-            --fulafu-study-ai-face-color: #e9f2ed;
         }
 
-        #${ROOT_ID} .fulafu-study-ai-brand-mark .fulafu-study-ai-face-icon {
+        #${ROOT_ID} .fulafu-study-ai-brand-mark .fulafu-study-ai-mark-icon {
             width: 21px;
             height: 21px;
         }
@@ -809,6 +821,7 @@
                 width: 100vw;
                 height: 100vh;
                 height: 100dvh;
+                max-height: none;
                 border-width: 0;
                 border-radius: 0;
             }
@@ -831,6 +844,10 @@
                 width: 42px;
                 min-width: 42px;
                 height: 44px;
+            }
+
+            #${ROOT_ID} [data-action="panel-side"] {
+                display: none !important;
             }
 
             #${ROOT_ID} .fulafu-study-ai-settings {
@@ -1016,6 +1033,7 @@
         root.dataset.version = SCRIPT_VERSION;
         root.dataset.releasedAt = SCRIPT_RELEASED_AT;
         root.dataset.focusMode = 'false';
+        root.dataset.panelSide = 'right';
         root.hidden = true;
         root.innerHTML = `
             <div class="fulafu-study-ai-backdrop" data-action="close" aria-hidden="true"></div>
@@ -1027,6 +1045,7 @@
                     <div class="fulafu-study-ai-header-actions">
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="settings" aria-label="连接设置" title="连接设置">⚙</button>
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="focus-mode" aria-label="进入专注模式" title="专注模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></button>
+                        <button class="fulafu-study-ai-icon-button" type="button" data-action="panel-side" aria-label="将专注面板移到左侧" title="移到左侧">←</button>
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="minimize" aria-label="缩小 AI 助手" title="缩小">−</button>
                         <button class="fulafu-study-ai-icon-button" type="button" data-action="close" aria-label="关闭 AI 助手" title="关闭">×</button>
                     </div>
@@ -1094,6 +1113,7 @@
             title: root.querySelector('#fulafu-study-ai-title'),
             settingsButton: root.querySelector('[data-action="settings"]'),
             focusButton: root.querySelector('[data-action="focus-mode"]'),
+            sideButton: root.querySelector('[data-action="panel-side"]'),
             settings: root.querySelector('.fulafu-study-ai-settings'),
             advanced: root.querySelector('[data-advanced]'),
             chatView: root.querySelector('[data-chat-view]'),
@@ -1137,6 +1157,7 @@
         if (action === 'minimize') minimizePanel();
         if (action === 'restore') restorePanel();
         if (action === 'focus-mode') setFocusMode(elements.root.dataset.focusMode !== 'true');
+        if (action === 'panel-side') setPanelSide(elements.root.dataset.panelSide === 'left' ? 'right' : 'left');
         if (action === 'settings') {
             if (elements.settings.hidden) showSettings();
             else hideSettings();
@@ -1253,6 +1274,16 @@
         else elements.title.textContent = elements.root.dataset.focusMode === 'true' ? '专注阅读' : '问 AI';
     }
 
+    function setPanelSide(side) {
+        if (!elements) return;
+        const nextSide = side === 'left' ? 'left' : 'right';
+        const moveToLeft = nextSide === 'right';
+        elements.root.dataset.panelSide = nextSide;
+        elements.sideButton.textContent = moveToLeft ? '←' : '→';
+        elements.sideButton.setAttribute('aria-label', moveToLeft ? '将专注面板移到左侧' : '将专注面板移到右侧');
+        elements.sideButton.title = moveToLeft ? '移到左侧' : '移到右侧';
+    }
+
     function setFocusMode(enabled) {
         if (!elements) return;
         const isEnabled = Boolean(enabled);
@@ -1260,7 +1291,7 @@
         elements.focusButton.dataset.active = isEnabled ? 'true' : 'false';
         elements.focusButton.setAttribute('aria-label', isEnabled ? '退出专注模式' : '进入专注模式');
         elements.focusButton.title = isEnabled ? '退出专注模式' : '专注模式';
-        elements.panel.setAttribute('aria-modal', isEnabled || window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
+        elements.panel.setAttribute('aria-modal', window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
         updatePanelHeading();
         if (!elements.settings.hidden) elements.settings.scrollTop = 0;
         else elements.conversation.scrollTop = elements.conversation.scrollHeight;
@@ -1271,7 +1302,7 @@
         elements.backdrop.hidden = false;
         elements.panel.hidden = false;
         elements.mini.hidden = true;
-        elements.panel.setAttribute('aria-modal', elements.root.dataset.focusMode === 'true' || window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
+        elements.panel.setAttribute('aria-modal', window.matchMedia('(max-width: 640px)').matches ? 'true' : 'false');
     }
 
     function minimizePanel() {
