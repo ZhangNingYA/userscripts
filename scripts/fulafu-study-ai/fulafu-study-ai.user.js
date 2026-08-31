@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.5
-// @lastUpdated  2026-08-31 17:51
+// @version      1.4.6
+// @lastUpdated  2026-08-31 21:37
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,8 +30,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.5';
-    const SCRIPT_RELEASED_AT = '2026-08-31 17:51:13 UTC+8';
+    const SCRIPT_VERSION = '1.4.6';
+    const SCRIPT_RELEASED_AT = '2026-08-31 21:37:25 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -50,6 +50,8 @@
     });
     const REASONING_EFFORTS = new Set(['default', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     const MAX_CONTEXT_LENGTH = 12000;
+    const CONTEXT_NEIGHBOR_COUNT = 2;
+    const MIN_CONTEXT_NEIGHBOR_BUDGET = 200;
     const REQUEST_TIMEOUT_MS = 120000;
     const MIN_QUESTIONABLE_LENGTH = 8;
     const AI_ICON_SVG = `<svg class="fulafu-study-ai-mark-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.5c.78 6.17 3.83 9.22 10.5 10.5-6.67 1.28-9.72 4.33-10.5 10.5C11.22 16.33 8.17 13.28 1.5 12 8.17 10.72 11.22 7.67 12 1.5Z"/></svg>`;
@@ -1032,16 +1034,29 @@
 
     function buildContextWindow(source) {
         const content = source.closest('.textbook-content');
-        const currentText = extractReadableText(source);
-        if (!content || !currentText) return currentText;
+        const fullCurrentText = extractReadableText(source);
+        if (!content || !fullCurrentText) return fullCurrentText;
+        const currentText = fullCurrentText;
         const currentHeading = precedingSectionHeading(source, content);
         const blocks = Array.from(content.querySelectorAll('p, li, .katex-display')).filter((element) => (
             isContextBlock(element) && precedingSectionHeading(element, content) === currentHeading
         ));
         const currentIndex = blocks.indexOf(source);
         if (currentIndex === -1) return currentText;
-        const previousText = currentIndex > 0 ? extractReadableText(blocks[currentIndex - 1]) : '';
-        const nextText = currentIndex + 1 < blocks.length ? extractReadableText(blocks[currentIndex + 1]) : '';
+        const previousBlocks = blocks.slice(Math.max(0, currentIndex - CONTEXT_NEIGHBOR_COUNT), currentIndex);
+        const nextBlocks = blocks.slice(currentIndex + 1, currentIndex + 1 + CONTEXT_NEIGHBOR_COUNT);
+        const neighborCount = previousBlocks.length + nextBlocks.length;
+        const availableNeighborBudget = Math.max(0, MAX_CONTEXT_LENGTH - currentText.length - 100);
+        const neighborBudget = neighborCount ? Math.floor(availableNeighborBudget / neighborCount) : 0;
+        const readNeighbors = (nearbyBlocks) => {
+            if (neighborBudget < MIN_CONTEXT_NEIGHBOR_BUDGET) return '';
+            return nearbyBlocks
+                .map((element) => extractReadableText(element).slice(0, neighborBudget))
+                .filter(Boolean)
+                .join('\n\n');
+        };
+        const previousText = readNeighbors(previousBlocks);
+        const nextText = readNeighbors(nextBlocks);
         const currentLabel = source.matches('.katex-display') ? '当前公式' : '当前段落';
         const parts = [];
         if (previousText) parts.push(`【上文】\n${previousText}`);
