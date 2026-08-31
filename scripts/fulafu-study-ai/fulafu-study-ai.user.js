@@ -3,8 +3,8 @@
 // @name:zh-CN   Fulafu 学习 AI 助手
 // @name:en      Fulafu Study AI Assistant
 // @namespace    https://scripts.fulafu.com/
-// @version      1.4.3
-// @lastUpdated  2026-08-31 11:51
+// @version      1.4.4
+// @lastUpdated  2026-08-31 14:28
 // @description  Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
 // @description:zh-CN 为 Fulafu Study 添加段落级 AI 提问、本地 API 设置、公式友好的原文引用与连续追问。
 // @description:en Add paragraph-level AI questions to Fulafu Study, with local API settings, formula-aware context, and follow-up conversations.
@@ -30,8 +30,8 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '1.4.3';
-    const SCRIPT_RELEASED_AT = '2026-08-31 11:51:40 UTC+8';
+    const SCRIPT_VERSION = '1.4.4';
+    const SCRIPT_RELEASED_AT = '2026-08-31 14:28:09 UTC+8';
     const ROOT_ID = 'fulafu-study-ai-root';
     const PANEL_ID = 'fulafu-study-ai-panel';
     const STYLE_ID = 'fulafu-study-ai-style';
@@ -984,7 +984,43 @@
         return extractReadableText(element).length >= 3;
     }
 
-    function makeAskButton(context, { formula = false } = {}) {
+    function isContextBlock(element) {
+        if (element.closest(`#${ROOT_ID}, nav, header, footer, .study-checkpoint, .textbook-inspector, .textbook-rail`)) return false;
+        if (element.matches('.katex-display') && element.closest('p, li')) return false;
+        if (element.matches('li') && element.querySelector(':scope > p')) return false;
+        return extractReadableText(element).length >= 3;
+    }
+
+    function precedingSectionHeading(element, content) {
+        let currentHeading = null;
+        for (const heading of content.querySelectorAll('h2')) {
+            if (heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) currentHeading = heading;
+            else break;
+        }
+        return currentHeading;
+    }
+
+    function buildContextWindow(source) {
+        const content = source.closest('.textbook-content');
+        const currentText = extractReadableText(source);
+        if (!content || !currentText) return currentText;
+        const currentHeading = precedingSectionHeading(source, content);
+        const blocks = Array.from(content.querySelectorAll('p, li, .katex-display')).filter((element) => (
+            isContextBlock(element) && precedingSectionHeading(element, content) === currentHeading
+        ));
+        const currentIndex = blocks.indexOf(source);
+        if (currentIndex === -1) return currentText;
+        const previousText = currentIndex > 0 ? extractReadableText(blocks[currentIndex - 1]) : '';
+        const nextText = currentIndex + 1 < blocks.length ? extractReadableText(blocks[currentIndex + 1]) : '';
+        const currentLabel = source.matches('.katex-display') ? '当前公式' : '当前段落';
+        const parts = [];
+        if (previousText) parts.push(`【上文】\n${previousText}`);
+        parts.push(`【${currentLabel}】\n${currentText}`);
+        if (nextText) parts.push(`【下文】\n${nextText}`);
+        return normalizeSpace(parts.join('\n\n')).slice(0, MAX_CONTEXT_LENGTH);
+    }
+
+    function makeAskButton(source, { formula = false } = {}) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = BUTTON_CLASS;
@@ -995,7 +1031,7 @@
         button.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            openPanel(context, { focusSettings: !config.apiKey });
+            openPanel(buildContextWindow(source), { focusSettings: !config.apiKey });
         });
         return button;
     }
@@ -1006,18 +1042,16 @@
         if (!content) return;
         content.querySelectorAll('p, li').forEach((element) => {
             if (!isQuestionable(element)) return;
-            const context = extractReadableText(element);
             element.setAttribute(DECORATED_ATTRIBUTE, 'true');
-            element.append(makeAskButton(context));
+            element.append(makeAskButton(element));
         });
         content.querySelectorAll('.katex-display').forEach((element) => {
             if (!isQuestionableFormula(element)) return;
-            const context = extractReadableText(element);
             const formula = element.querySelector(':scope > .katex');
             if (!formula) return;
             element.setAttribute(DECORATED_ATTRIBUTE, 'true');
             formula.classList.add(FORMULA_WRAPPER_CLASS);
-            formula.append(makeAskButton(context, { formula: true }));
+            formula.append(makeAskButton(element, { formula: true }));
         });
     }
 
@@ -1088,11 +1122,11 @@
                         <section class="fulafu-study-ai-composer" aria-label="提问区">
                             <div class="fulafu-study-ai-context-card">
                                 <div class="fulafu-study-ai-context-head">
-                                    <span class="fulafu-study-ai-context-label">引用段落</span>
+                                    <span class="fulafu-study-ai-context-label">阅读上下文</span>
                                     <span class="fulafu-study-ai-context-preview" data-context-preview></span>
                                     <button class="fulafu-study-ai-context-toggle" type="button" data-action="toggle-context">编辑</button>
                                 </div>
-                                <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前段落内容" hidden></textarea>
+                                <textarea class="fulafu-study-ai-context" id="fulafu-study-ai-context" data-context aria-label="当前阅读上下文" hidden></textarea>
                             </div>
                             <div class="fulafu-study-ai-question-shell">
                                 <textarea class="fulafu-study-ai-question" data-question rows="1" aria-label="你的问题" placeholder="针对这段内容提问…"></textarea>
@@ -1798,7 +1832,7 @@
 
     function getPromptContext() {
         const value = normalizeSpace(elements.context.value).slice(0, MAX_CONTEXT_LENGTH);
-        if (!value) throw new Error('当前段落为空，请先填写要讨论的内容。');
+        if (!value) throw new Error('阅读上下文为空，请先填写要讨论的内容。');
         if (value !== currentContext) {
             currentContext = value;
             contextRevision += 1;
@@ -1809,8 +1843,8 @@
     function buildInstructions() {
         return [
             '你是一个耐心、准确的中文学习助手。优先使用简体中文回答，除非用户明确要求其他语言。',
-            '每一轮用户消息都包含当时正在阅读的引用段落。请结合本次访问中此前的问答和该轮引用回答。',
-            '公式使用清楚的纯文本或 LaTeX 表示。不要假装引用段落包含它没有提供的信息。',
+            '每一轮用户消息都包含当时正在阅读的上下文，并标明上文、当前段落或公式、下文。请结合本次访问中此前的问答和该轮上下文回答。',
+            '回答应优先围绕“当前段落”或“当前公式”，前后文用于补充语义。公式使用清楚的纯文本或 LaTeX 表示，不要假装上下文包含它没有提供的信息。',
             `页面标题：${document.title}`
         ].join('\n');
     }
@@ -1819,7 +1853,7 @@
         if (item.role !== 'user' || !item.context) return { role: item.role, content: item.content };
         return {
             role: 'user',
-            content: `【本轮引用段落】\n${item.context}\n\n【问题】\n${item.content}`
+            content: `【本轮阅读上下文】\n${item.context}\n\n【问题】\n${item.content}`
         };
     }
 
