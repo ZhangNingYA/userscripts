@@ -3,11 +3,11 @@
 // @name:zh-CN   测试1
 // @name:en      Test 1
 // @namespace    https://scripts.fulafu.com/
-// @version      2.3.2
-// @lastUpdated  2026-09-05 15:14
-// @description  ① 3*O & 91/SP*：绕过 VIP 限制提取原画/高清 MP4 直链播放与下载；② *王论坛：免金币读取付费区视频 m3u8；③ J*vhub：突破观看限额，免会员全片流式下载；④ X*sian：免 VIP 突破 120 秒试看限制，伪造本地会员态及分片合成下载；⑤ 爱*社区(bb*)：免 VIP/订阅/金币在线播放原画，支持完整视频 .ts 下载。
-// @description:zh-CN ① 3*O & 91/SP*：绕过 VIP 限制提取原画/高清 MP4 直链播放与下载；② *王论坛：免金币读取付费区视频 m3u8；③ J*vhub：突破观看限额，免会员全片流式下载；④ X*sian：免 VIP 突破 120 秒试看限制，伪造本地会员态及分片合成下载；⑤ 爱*社区(bb*)：免 VIP/订阅/金币在线播放原画，支持完整视频 .ts 下载。
-// @description:en A five-in-one media helper for supported video sites, with direct playback and download tools.
+// @version      2.3.3
+// @lastUpdated  2026-09-05 15:30
+// @description  整合五个视频工具模块：3GO 与 SP2026/91Porn 高清直链、老王论坛视频解析、JavHub 完整视频下载、XAsian 完整播放，以及 AVJB/BBAV HLS 播放与下载。
+// @description:zh-CN 整合五个视频工具模块：3GO 与 SP2026/91Porn 高清直链、老王论坛视频解析、JavHub 完整视频下载、XAsian 完整播放，以及 AVJB/BBAV HLS 播放与下载。
+// @description:en Five video tools: HD links for 3GO and SP2026/91Porn, video extraction for Laowang Forum, full-video downloads for JavHub, complete playback for XAsian, and HLS playback and downloads for AVJB/BBAV.
 // @author       local
 // @homepageURL  https://scripts.fulafu.com/scripts/test1/
 // @supportURL   https://github.com/ZhangNingYA/userscripts/issues
