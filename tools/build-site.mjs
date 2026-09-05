@@ -44,14 +44,14 @@ function cleanTargetDisplay(value) {
 function targetsFromMatches(matches) {
   const targets = new Map();
   for (const match of matches) {
-    const hostMatch = String(match).match(/^https?:\/\/([^/]+)/i);
+    const hostMatch = String(match).match(/^(?:https?:|\*:)\/\/([^/]+)/i);
     if (!hostMatch) continue;
     const hostname = hostMatch[1].replace(/^\*\./, '').replace(/^www\./, '').toLowerCase();
     const presentation = sitePresentation.get(hostname) || {};
     const key = presentation.key || hostname;
     if (targets.has(key)) continue;
     const url = presentation.url || `https://${hostname}/`;
-    const matchPath = String(match).match(/^https?:\/\/[^/]+(\/.*)$/i)?.[1] || '/';
+    const matchPath = String(match).match(/^(?:https?:|\*:)\/\/[^/]+(\/.*)$/i)?.[1] || '/';
     targets.set(key, {
       label: presentation.label || titleCaseHostname(hostname),
       hostname: new URL(url).hostname.replace(/^www\./, ''),
