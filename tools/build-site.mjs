@@ -25,21 +25,7 @@ const sitePresentation = new Map([
   ['nbcnews.com', { label: 'NBC News', url: 'https://www.nbcnews.com/' }],
   ['cbsnews.com', { label: 'CBS News', url: 'https://www.cbsnews.com/' }],
   ['foxnews.com', { label: 'Fox News', url: 'https://www.foxnews.com/' }],
-  ['ptt.cc', { label: 'PTT Gossiping', url: 'https://www.ptt.cc/bbs/Gossiping/index.html', display: 'ptt.cc/bbs/Gossiping/*' }],
-  ['media.3go.fun', { key: '3go.fun', label: '3GO', url: 'https://tube.3go.fun/', display: 'tube.3go.fun / media.3go.fun' }],
-  ['tube.3go.fun', { key: '3go.fun', label: '3GO', url: 'https://tube.3go.fun/', display: 'tube.3go.fun / media.3go.fun' }],
-  ['up.sp2026.com', { key: 'sp2026.com', label: 'SP2026', url: 'https://sp2026.com/', display: 'sp2026.com / up.sp2026.com' }],
-  ['sp2026.com', { label: 'SP2026', url: 'https://sp2026.com/', display: 'sp2026.com / up.sp2026.com' }],
-  ['91.9p9.xyz', { key: '91porn.com', label: '91Porn', url: 'https://91porn.com/', display: '91porn.com / 9p9.xyz' }],
-  ['9p9.xyz', { key: '91porn.com', label: '91Porn', url: 'https://91porn.com/', display: '91porn.com / 9p9.xyz' }],
-  ['91porn.com', { label: '91Porn', url: 'https://91porn.com/', display: '91porn.com / 9p9.xyz' }],
-  ['laowang.vip', { label: 'Laowang Forum', url: 'https://laowang.vip/', display: 'laowang.vip / alternate domains' }],
-  ['laowangopk893.vip', { key: 'laowang.vip', label: 'Laowang Forum', url: 'https://laowang.vip/', display: 'laowang.vip / alternate domains' }],
-  ['javhub.net', { label: 'JavHub', url: 'https://javhub.net/', display: 'javhub.net/play/*' }],
-  ['ja.javhub.net', { key: 'javhub.net', label: 'JavHub', url: 'https://javhub.net/', display: 'javhub.net/play/*' }],
-  ['xasian.org', { label: 'XAsian', url: 'https://xasian.org/', display: 'xasian.org/*' }],
-  ['bbav110.com', { key: 'avjb.com', label: 'AVJB Community', url: 'https://bbav110.com/', display: 'bbav110.com / avjb.com' }],
-  ['avjb.com', { label: 'AVJB Community', url: 'https://bbav110.com/', display: 'bbav110.com / avjb.com' }]
+  ['ptt.cc', { label: 'PTT Gossiping', url: 'https://www.ptt.cc/bbs/Gossiping/index.html', display: 'ptt.cc/bbs/Gossiping/*' }]
 ]);
 
 function titleCaseHostname(hostname) {
@@ -58,14 +44,14 @@ function cleanTargetDisplay(value) {
 function targetsFromMatches(matches) {
   const targets = new Map();
   for (const match of matches) {
-    const hostMatch = String(match).match(/^(?:https?:|\*:)\/\/([^/]+)/i);
+    const hostMatch = String(match).match(/^https?:\/\/([^/]+)/i);
     if (!hostMatch) continue;
     const hostname = hostMatch[1].replace(/^\*\./, '').replace(/^www\./, '').toLowerCase();
     const presentation = sitePresentation.get(hostname) || {};
     const key = presentation.key || hostname;
     if (targets.has(key)) continue;
     const url = presentation.url || `https://${hostname}/`;
-    const matchPath = String(match).match(/^(?:https?:|\*:)\/\/[^/]+(\/.*)$/i)?.[1] || '/';
+    const matchPath = String(match).match(/^https?:\/\/[^/]+(\/.*)$/i)?.[1] || '/';
     targets.set(key, {
       label: presentation.label || titleCaseHostname(hostname),
       hostname: new URL(url).hostname.replace(/^www\./, ''),
